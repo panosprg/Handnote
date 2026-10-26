@@ -24,4 +24,23 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
      and survives updates (new tools from later versions appear at the end, not in random places).
    - Covers everything in the bar: tools, undo/redo, outline, ruler, shapes, notebook.
 
+4. **One Pen button, with the pen type in "Line options"** (from your handwritten note, 26 Oct).
+   - The top bar gets a single **Pen** button instead of Pen + Fountain pen side by side.
+   - The pen's menu (the one the colour-wheel button opens) gets a **Line options** section with:
+     - **Ballpoint**: even line (today's "Pen").
+     - **Fountain**: follows Pencil pressure.
+     - **Dotted**: `· · · · · ·`
+     - **Dashed**: `— — — — —`
+   - Each type keeps its own colour and size, like now.
+   - Dotted/dashed are new. Excalidraw can't draw handwritten lines dotted or dashed, so Handnote
+     has to make them itself (e.g. cut the stroke into dots/dashes when the Pencil lifts, kept as one
+     stroke for selecting, erasing and undo). Dot/dash spacing should follow the size.
+
+5. **Quick sizes: only the ones you pick, max 3.** The size dots in the second bar show only the sizes
+   you've chosen (up to 3), not the fixed list of 6. You set them in the pen's menu (e.g. tap a size,
+   "Pin to bar"). Each pen type/highlighter keeps its own 3. The exact mm chip stays.
+
+6. **Same for the erasers.** One **Eraser** button in the top bar instead of two. Precision /
+   object chosen in its menu (like Line options), and its quick sizes are also the ones you pick, max 3.
+
 ## Done
