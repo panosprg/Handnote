@@ -1,0 +1,90 @@
+/* Long-press radial menu */
+
+.hn-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.04);
+  animation: hn-fade 0.15s ease;
+}
+
+.hn-menu {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.hn-menu-hub {
+  position: absolute;
+  left: -14px;
+  top: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  animation: hn-pop 0.2s ease;
+}
+
+.hn-root button.hn-menu-item {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  left: -23px;
+  top: -23px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--hn-text);
+  cursor: pointer;
+  animation: hn-fly 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  transition: transform 0.12s ease, background 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hn-root button.hn-menu-item.is-active {
+  color: var(--hn-active-fg);
+}
+.hn-root button.hn-menu-item.is-hover {
+  background: var(--hn-active);
+  box-shadow: 0 0 0 2px var(--hn-active-fg), var(--hn-glass-shadow);
+}
+.hn-menu-item .hn-swatch {
+  width: 26px;
+  height: 26px;
+}
+
+/* Glass on menu items (their reset above would otherwise strip it). */
+.hn-root button.hn-menu-item.hn-glass {
+  background: var(--hn-glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 0.5px solid var(--hn-glass-border);
+  box-shadow: var(--hn-glass-shadow), inset 0 1px 0 var(--hn-glass-highlight);
+}
+.hn-root button.hn-menu-item.hn-solid {
+  background: var(--hn-solid-bg);
+  box-shadow: var(--hn-glass-shadow);
+}
+.hn-root button.hn-menu-item.is-hover {
+  background: var(--hn-active);
+  box-shadow: 0 0 0 2px var(--hn-active-fg), var(--hn-glass-shadow);
+  scale: 1.15;
+}
+
+
+@keyframes hn-fly {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-menu-hub,
+  .hn-root button.hn-menu-item {
+    animation: none;
+  }
+}

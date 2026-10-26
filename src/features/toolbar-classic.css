@@ -1,0 +1,89 @@
+/* Classic toolbar (top of the page) */
+
+/* Make room for the toolbar above Excalidraw's own top bar. */
+.hn-style-classic .excalidraw .App-menu_top {
+  margin-top: 60px;
+}
+
+
+.hn-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 24px;
+  max-width: calc(100% - 20px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hn-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hn-root button.hn-btn {
+  all: unset;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--hn-text);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hn-root button.hn-btn:active {
+  transform: scale(0.92);
+}
+.hn-root button.hn-btn.is-active {
+  background: var(--hn-active);
+  color: var(--hn-active-fg);
+}
+.hn-root button.hn-btn.hn-fav-quick {
+  width: 32px;
+}
+
+.hn-icon {
+  display: grid;
+  place-items: center;
+}
+.hn-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.9;
+}
+
+.hn-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: rgba(127, 127, 127, 0.28);
+}
+
+.hn-swatch {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.hn-swatch-sm {
+  width: 18px;
+  height: 18px;
+}
+.hn-fav-quick.is-active .hn-swatch {
+  box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 3.5px var(--hn-active-fg);
+}
+
+
+.hn-panel.hn-panel-top {
+  top: 62px;
+}

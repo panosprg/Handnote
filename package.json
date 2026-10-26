@@ -1,0 +1,29 @@
+{
+  "name": "handnote",
+  "version": "0.2.0",
+  "description": "Handwritten notes for Obsidian on iPad, built on Excalidraw",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "test": "npm run build:test && python3 test/run.py",
+    "build:test": "esbuild test/harness.tsx --bundle --outdir=test/out --format=iife --alias:obsidian=./test/obsidian-stub.ts --define:process.env.NODE_ENV=\\\"production\\\" --define:process.env.IS_PREACT=\\\"false\\\" --conditions=production --jsx=automatic --loader:.woff2=dataurl --log-level=error",
+    "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "builtin-modules": "^5.4.0",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "typescript": "^7.0.2"
+  }
+}

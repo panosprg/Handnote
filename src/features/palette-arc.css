@@ -1,0 +1,174 @@
+/* Curved glass palette */
+
+.hn-root {
+  --hn-stick-light: #ffffff;
+  --hn-stick-edge: #e4e4ea;
+  --hn-stick-shade: #cfd0d8;
+  --hn-stick-outline: rgba(0, 0, 0, 0.16);
+  --hn-stick-metal: #c3c6cf;
+  --hn-stick-ink: #4a4a52;
+}
+.hn-root.hn-dark {
+  --hn-stick-light: #f2f2f6;
+  --hn-stick-edge: #c9cad2;
+  --hn-stick-shade: #a9abb6;
+  --hn-stick-outline: rgba(0, 0, 0, 0.35);
+}
+
+.hn-arc {
+  position: absolute;
+  z-index: 20;
+  transform-origin: 0 100%;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.hn-arc-band,
+.hn-arc-shadow,
+.hn-arc-edge {
+  position: absolute;
+  inset: 0;
+}
+
+.hn-arc-band {
+  pointer-events: auto;
+  cursor: grab;
+  /* glass classes add the blur; clip-path gives the arch shape */
+  border: none !important;
+  box-shadow: none !important;
+}
+.hn-arc-band.hn-glass {
+  background: var(--hn-glass-bg);
+}
+
+.hn-arc-shadow path {
+  fill: rgba(20, 30, 50, 0.16);
+  transform: translateY(6px);
+  filter: blur(9px);
+}
+.hn-dark .hn-arc-shadow path {
+  fill: rgba(0, 0, 0, 0.5);
+}
+
+.hn-arc-edge,
+.hn-arc-shadow {
+  pointer-events: none;
+  overflow: visible;
+}
+.hn-arc-edge path {
+  fill: none;
+  stroke: var(--hn-glass-border);
+  stroke-width: 1;
+}
+
+/* round buttons on the band */
+.hn-root button.hn-arc-btn {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--hn-text);
+  border: 1.5px solid rgba(127, 127, 127, 0.35);
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hn-dark button.hn-arc-btn {
+  background: rgba(255, 255, 255, 0.06);
+}
+.hn-root button.hn-arc-btn:active {
+  transform: scale(0.9);
+}
+.hn-root button.hn-arc-btn.is-active {
+  border-color: var(--hn-active-fg);
+  color: var(--hn-active-fg);
+}
+
+.hn-arc-color {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: conic-gradient(#ff5f6d, #ffc371, #f9f871, #6bdc8b, #4fc3f7, #7c83ff, #d36bff, #ff5f6d);
+}
+.hn-arc-color span {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2.5px var(--hn-paper);
+}
+.hn-dark .hn-arc-color span {
+  filter: invert(93%) hue-rotate(180deg);
+}
+
+/* tools standing on the band */
+.hn-root button.hn-stick {
+  all: unset;
+  position: absolute;
+  pointer-events: auto;
+  width: 34px;
+  height: 96px;
+  transform-origin: 50% 100%;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), filter 0.2s ease;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.12));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.hn-root button.hn-stick.is-active {
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.18));
+}
+.hn-stick svg {
+  display: block;
+}
+.hn-stick-icon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--hn-stick-ink);
+}
+.hn-stick-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* panels attached to the palette */
+.hn-panel.hn-panel-arc {
+  top: auto;
+  transform: translateX(-50%);
+}
+
+.hn-root button.hn-chip {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.12);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hn-root button.hn-chip.is-active {
+  background: var(--hn-active);
+  color: var(--hn-active-fg);
+}
+.hn-chip .hn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Arc style: Excalidraw's own footer would collide with the palette. */
+.hn-style-arc:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-left,
+.hn-style-arc:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-right,
+.hn-style-arc:not(.hn-native) .excalidraw .App-bottom-bar {
+  display: none !important;
+}

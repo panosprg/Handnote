@@ -1,0 +1,357 @@
+/* ============ Layout ============ */
+
+.workspace-leaf-content[data-type="handnote-view"] .view-content.hn-view {
+  padding: 0;
+  overflow: hidden;
+}
+
+.hn-host,
+.hn-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.hn-root {
+  --hn-paper: #fdfcf9;
+  --hn-line: rgba(70, 110, 170, 0.18);
+  --hn-dot: rgba(60, 60, 70, 0.28);
+  --hn-glass-bg: rgba(255, 255, 255, 0.58);
+  --hn-glass-border: rgba(255, 255, 255, 0.75);
+  --hn-glass-highlight: rgba(255, 255, 255, 0.9);
+  --hn-glass-shadow: 0 10px 30px rgba(20, 30, 50, 0.14), 0 2px 6px rgba(20, 30, 50, 0.08);
+  --hn-solid-bg: #f6f6f8;
+  --hn-text: #1d1d1f;
+  --hn-muted: rgba(60, 60, 67, 0.6);
+  --hn-active: rgba(0, 122, 255, 0.14);
+  --hn-active-fg: #007aff;
+  color: var(--hn-text);
+}
+
+.hn-root.hn-dark {
+  --hn-paper: #1c1c1e;
+  --hn-line: rgba(140, 170, 220, 0.16);
+  --hn-dot: rgba(220, 220, 230, 0.22);
+  --hn-glass-bg: rgba(44, 44, 48, 0.55);
+  --hn-glass-border: rgba(255, 255, 255, 0.12);
+  --hn-glass-highlight: rgba(255, 255, 255, 0.16);
+  --hn-glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --hn-solid-bg: #2c2c2e;
+  --hn-text: #f5f5f7;
+  --hn-muted: rgba(235, 235, 245, 0.6);
+  --hn-active: rgba(10, 132, 255, 0.24);
+  --hn-active-fg: #0a84ff;
+}
+
+/* ============ Paper ============ */
+
+.hn-paper {
+  position: absolute;
+  inset: 0;
+  background-color: var(--hn-paper);
+  pointer-events: none;
+}
+
+.hn-tpl-lined .hn-paper,
+.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
+}
+
+.hn-tpl-grid .hn-paper,
+.hn-paper-opt.hn-tpl-grid .hn-paper-preview {
+  background-image:
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px)),
+    linear-gradient(to right, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
+}
+
+.hn-tpl-dots .hn-paper,
+.hn-paper-opt.hn-tpl-dots .hn-paper-preview {
+  background-image: radial-gradient(circle at 1px 1px, var(--hn-dot) 1.3px, transparent 1.8px);
+}
+
+/* ============ Excalidraw integration ============ */
+
+.hn-excalidraw {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.hn-root .excalidraw,
+.hn-root .excalidraw .excalidraw__canvas {
+  background: transparent !important;
+}
+
+
+/* Hide Excalidraw's own tool bar unless "Shapes, text and more" is on. */
+.hn-root:not(.hn-native) .excalidraw .App-toolbar-container,
+.hn-root:not(.hn-native) .excalidraw .App-toolbar--mobile,
+.hn-root:not(.hn-native) .excalidraw .HintViewer,
+.hn-root:not(.hn-native) .excalidraw .layer-ui__wrapper__top-right,
+.hn-root:not(.hn-native) .excalidraw .App-menu__left {
+  display: none !important;
+}
+
+/* ============ Glass ============ */
+
+.hn-glass {
+  background: var(--hn-glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 0.5px solid var(--hn-glass-border);
+  box-shadow:
+    var(--hn-glass-shadow),
+    inset 0 1px 0 var(--hn-glass-highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.hn-solid {
+  background: var(--hn-solid-bg);
+  border: 1px solid rgba(127, 127, 127, 0.2);
+  box-shadow: var(--hn-glass-shadow);
+}
+
+/* ============ Panels ============ */
+
+.hn-panel {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  width: min(340px, calc(100% - 24px));
+  padding: 14px 16px 16px;
+  border-radius: 22px;
+  animation: hn-pop 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.hn-panel-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.hn-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--hn-muted);
+  margin: 14px 0 8px;
+}
+.hn-value {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--hn-text);
+}
+
+.hn-root button.hn-link {
+  all: unset;
+  cursor: pointer;
+  color: var(--hn-active-fg);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.hn-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hn-root button.hn-hue,
+.hn-root button.hn-shade,
+.hn-root button.hn-fav {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hn-root button.hn-hue {
+  width: 26px;
+  height: 26px;
+}
+.hn-root button.hn-hue.is-active {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 4px var(--hn-text);
+}
+
+.hn-shades {
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(127, 127, 127, 0.1);
+}
+.hn-root button.hn-shade {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+}
+.hn-root button.hn-shade.is-active,
+.hn-root button.hn-fav.is-active {
+  box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 4px var(--hn-active-fg);
+}
+
+.hn-wheel {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin-left: auto;
+  cursor: pointer;
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.hn-wheel::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: var(--hn-paper);
+}
+.hn-wheel input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.hn-root button.hn-fav {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+}
+.hn-root button.hn-fav-add {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--hn-muted);
+  font-size: 20px;
+  line-height: 1;
+}
+.hn-fav-x {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff3b30;
+  color: white;
+  font-size: 13px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.hn-root button.hn-width {
+  all: unset;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: rgba(127, 127, 127, 0.1);
+}
+.hn-root button.hn-width span {
+  display: block;
+  border-radius: 50%;
+}
+.hn-root button.hn-width.is-active {
+  background: var(--hn-active);
+  box-shadow: inset 0 0 0 1.5px var(--hn-active-fg);
+}
+
+.hn-slider {
+  width: 100%;
+  accent-color: var(--hn-active-fg);
+}
+
+/* Paper picker */
+.hn-root button.hn-paper-opt {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.hn-paper-preview {
+  display: block;
+  width: 60px;
+  height: 78px;
+  border-radius: 10px;
+  background-color: var(--hn-paper);
+  background-size: 10px 10px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
+  background-size: 100% 10px;
+}
+.hn-paper-opt.is-active .hn-paper-preview {
+  box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 4px var(--hn-active-fg);
+}
+.hn-paper-opt.is-active .hn-paper-name {
+  color: var(--hn-active-fg);
+  font-weight: 600;
+}
+
+/* ============ Animations ============ */
+
+@keyframes hn-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes hn-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-panel {
+    animation: none;
+  }
+}
+
+/* Dark mode: Excalidraw inverts ink on the canvas, so show swatches the way the ink will look. */
+.hn-dark .hn-swatch,
+.hn-dark .hn-root button.hn-hue,
+.hn-dark button.hn-hue,
+.hn-dark button.hn-shade,
+.hn-dark button.hn-fav:not(.hn-fav-add),
+.hn-dark .hn-width span {
+  filter: invert(93%) hue-rotate(180deg);
+}
+
+/* Settings tab: indent a feature's own settings under it */
+.hn-setting-group {
+  margin: -6px 0 10px 18px;
+  padding-left: 12px;
+  border-left: 2px solid var(--background-modifier-border, rgba(127, 127, 127, 0.25));
+}

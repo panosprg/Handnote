@@ -1,0 +1,53 @@
+/* Erase animation: the stroke blurs, then un-draws from its start to its end. */
+
+.hn-ghost {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  pointer-events: none;
+  overflow: visible;
+  animation-name: hn-ghost-blur;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+.hn-ghost-retract polyline {
+  stroke-dasharray: 1 1;
+  animation-name: hn-ghost-undraw;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.75, 0.6);
+  animation-fill-mode: forwards;
+}
+
+@keyframes hn-ghost-blur {
+  0% {
+    filter: blur(0);
+    opacity: 1;
+  }
+  20% {
+    filter: blur(1.2px);
+    opacity: 0.9;
+  }
+  100% {
+    filter: blur(2.5px);
+    opacity: 0;
+  }
+}
+
+@keyframes hn-ghost-undraw {
+  0%,
+  15% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-ghost,
+  .hn-ghost polyline {
+    animation-duration: 1ms !important;
+  }
+}
