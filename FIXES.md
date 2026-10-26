@@ -53,4 +53,45 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
    / native Excalidraw UI is on). Check nothing needed is only reachable from it (export, dark mode and
    clear page already live in Handnote's own menus).
 
+9. **More page templates (productivity and study).** Today there are blank, lined, grid and dots.
+   From a quick look at what Goodnotes/Paperlike template packs offer, add:
+   - **Cornell notes**: cue column on the left, notes on the right, summary box at the bottom.
+     It's the most recommended study layout.
+   - **Lecture notes**: header row (course, topic, date), then lined. For Deree classes.
+   - **Two-column**: lines on one side, grid on the other. Good for accounting/maths working next to explanations.
+   - **Daily planner**: date, top 3 priorities, time-blocked schedule, to-do list, notes.
+   - **Weekly planner**: 7 day boxes plus a weekly goals/to-do strip.
+   - **To-do / checklist**: rows with tick boxes.
+   - **Eisenhower matrix**: 4 boxes (urgent/important), for prioritising tasks.
+   - **Meeting notes**: attendees, agenda, discussion, action items (who/what/when).
+   - **Habit tracker**: habits × days-of-the-month grid.
+   - **Mind map**: centre bubble on dot paper.
+   - **Study / revision sheet**: key terms, formulas, summary, questions to review.
+   - **Isometric dots**: for 3D sketches and diagrams.
+
+   Notes for building them:
+   - Drawn as vector backgrounds like today's templates, so they're sharp at any zoom and in PDF export/print.
+   - Light and dark versions, and the paper picker shows a small preview of each.
+   - Per page, not just per notebook: e.g. page 1 a planner, the rest lined.
+
+10. **Remember each notebook's template.** The template you pick must stick to that notebook (and page),
+    and come back the same when you reopen it, on any device. Today it can reset.
+    - Lead: the choice is passed up (`onTemplateChange` in `view.tsx`) but check that the save
+      (`getViewData`) actually writes it, and that opening a note doesn't overwrite it with the default.
+    - New notebooks still start with the default template from settings.
+
+11. **Print button in the Notebook menu.**
+    - Builds the same PDF as Export (pages + template + ink, PDF backgrounds included) and opens the
+      iPad print sheet (AirPrint).
+    - Obsidian on iPad can't always print a page directly, so the fallback is: make the PDF, open it,
+      and let the share sheet's Print take it.
+    - Options: all pages / current page / a page range.
+
+12. **Saved indicator (green / red).** A small dot in the top bar:
+    - green = everything is saved;
+    - red = unsaved changes (e.g. right after a stroke, until the save lands);
+    - Optional: amber while saving.
+    - Tap it to save now. If a save fails (e.g. iCloud problem), it stays red and says why.
+    - Placed where it never hides the tools (end of the top bar, or next to the page counter).
+
 ## Done
