@@ -483,3 +483,40 @@
   width: 16px;
   height: 16px;
 }
+
+/* Bar over a selection */
+.hn-selbar {
+  position: absolute;
+  z-index: 22;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 16px;
+  max-width: calc(100% - 20px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: hn-pop 0.15s ease;
+}
+.hn-root button.hn-selbar-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--hn-text);
+  cursor: pointer;
+}
+.hn-root button.hn-selbar-btn:active {
+  background: var(--hn-active);
+}
+.hn-root button.hn-selbar-btn:disabled {
+  opacity: 0.5;
+}
+.hn-selbar-btn .hn-icon svg {
+  width: 16px;
+  height: 16px;
+}

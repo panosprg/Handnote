@@ -105,6 +105,20 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
             <Icon name={t.icon} />
           </button>
         ))}
+        {ctx.registry
+          .enabled(settings)
+          .flatMap((f) => f.toolbarButtons ?? [])
+          .map((b) => (
+            <button
+              key={b.id}
+              className={`hn-btn ${b.active?.(ctx) ? "is-active" : ""}`}
+              aria-label={b.label}
+              title={b.label}
+              onClick={() => b.onClick(ctx)}
+            >
+              <Icon name={b.icon} />
+            </button>
+          ))}
         <button
           className={`hn-btn ${ui.showNative ? "is-active" : ""}`}
           aria-label="Shapes and text"

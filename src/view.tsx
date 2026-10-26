@@ -1,4 +1,4 @@
-import { Notice, TextFileView, arrayBufferToBase64, normalizePath, type WorkspaceLeaf } from "obsidian";
+import { FuzzySuggestModal, Notice, TextFileView, arrayBufferToBase64, normalizePath, requestUrl, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { createRoot, type Root } from "react-dom/client";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
@@ -11,6 +11,28 @@ import { parseNote, type HandnoteFile } from "./data";
 import type HandnotePlugin from "./main";
 
 export const VIEW_TYPE_HANDNOTE = "handnote-view";
+
+class NotePicker extends FuzzySuggestModal<TFile> {
+  private picked = false;
+  constructor(app: App, private done: (f: TFile | null) => void) {
+    super(app);
+    this.setPlaceholder("Link to which note?");
+  }
+  getItems() {
+    return this.app.vault.getFiles().filter((f) => f.extension === "md" || f.extension === "handnote");
+  }
+  getItemText(f: TFile) {
+    return f.path;
+  }
+  onChooseItem(f: TFile) {
+    this.picked = true;
+    this.done(f);
+  }
+  onClose() {
+    // onChooseItem runs after onClose; wait a tick before reporting "nothing picked".
+    window.setTimeout(() => !this.picked && this.done(null), 50);
+  }
+}
 
 export class HandnoteView extends TextFileView {
   private root: Root | null = null;
@@ -111,6 +133,16 @@ export class HandnoteView extends TextFileView {
 
   private host: HostActions = {
     notePath: () => this.file?.path ?? "",
+    pickNote: () =>
+      new Promise((resolve) =>
+        new NotePicker(this.app, (f) =>
+          resolve(f ? `[[${this.app.metadataCache.fileToLinktext(f, this.file?.path ?? "", f.extension === "md")}]]` : null),
+        ).open(),
+      ),
+    request: async (url, init) => {
+      const r = await requestUrl({ url, method: init.method, headers: init.headers, body: init.body, throw: false });
+      return { status: r.status, text: r.text };
+    },
     openLink: (link: string) => this.app.workspace.openLinkText(link.replace(/^\[\[|\]\]$/g, ""), this.file?.path ?? "", true),
     exportPdf: async () => {
       if (!this.ctx || !this.file) return;

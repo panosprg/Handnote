@@ -109,6 +109,7 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch" || (e.target as HTMLElement)?.tagName !== "CANVAS") return;
       count++;
+      if (ctx.claimedTouches.has(e.pointerId)) return clear();
       if (count > 1 || live.current.menu) return clear();
       finger = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY };
       clear();

@@ -6,6 +6,7 @@ import type { HandnoteFile } from "../data";
 import { HandnoteContext, type El, type HostActions } from "./context";
 import type { PagesInfo } from "./pages";
 import { fitWidth, Paper, PagesUi, type PaperHandle } from "./Paper";
+import { SelectionBar } from "./SelectionBar";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
 import { BALLPOINT_FILTER } from "./tools";
@@ -226,6 +227,7 @@ export default function Canvas(props: CanvasProps) {
         />
       </div>
       {ctx && <PagesUi ctx={ctx} />}
+      {ctx && <SelectionBar ctx={ctx} actions={enabled.flatMap((f) => f.selectionActions ?? [])} />}
       {overlays}
     </div>
   );

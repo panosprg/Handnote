@@ -2,6 +2,22 @@
 
 Handwritten notes for Obsidian, made for iPad + Apple Pencil, built on the Excalidraw engine.
 
+## What it does
+
+- **Notebooks with pages** (A4, or the pages of an imported PDF), a library with covers and folders, export to PDF.
+- **Pens:** fountain pen (pressure), ballpoint (even line), pencil, highlighter (goes under the ink, snaps straight).
+- **Erasers:** precision (only what you rub) and object (whole strokes), with an un-draw animation; scribble to delete.
+- **Writing help:** shape-preserving stabilization, hold-to-snap shapes, ruler, Pencil-tip indicator.
+- **Selecting:** lasso and rectangle, one clean outline; selection bar with headings, links and Solve.
+- **Headings + outline**, **links to notes**, **maths solving** (the last two kinds of recognition need MyScript keys).
+- **Gestures:** one finger scrolls, pinch zooms, two/three-finger tap = undo/redo, finger hold or Pencil press-and-hold opens the quick dial.
+
+### Handwriting recognition (optional)
+
+Headings-as-text and maths use MyScript, the engine Goodnotes and Nebo use. Make a free account at
+developer.myscript.com, create an application, and paste its **Application key** and **HMAC key** into
+Settings → Handnote → Handwriting recognition. It needs internet; everything else works offline.
+
 ## Install and update on iPad (BRAT)
 
 Updates arrive automatically once this is set up. You only do it once.

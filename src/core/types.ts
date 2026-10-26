@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { HandnoteContext } from "./context";
+import type { El, HandnoteContext } from "./context";
 
 /**
  * ============================================================
@@ -36,6 +36,25 @@ export interface ToolDef {
   Panel?: ComponentType<{ ctx: HandnoteContext }>;
 }
 
+/** A button a feature adds to the top bar. */
+export interface ToolbarButton {
+  id: string;
+  label: string;
+  icon: string;
+  onClick(ctx: HandnoteContext): void;
+  active?(ctx: HandnoteContext): boolean;
+}
+
+/** An action shown in the bar that appears over a selection. */
+export interface SelectionAction {
+  id: string;
+  label: string;
+  icon: string;
+  /** Hide the action when it doesn't apply to this selection. */
+  when?(ctx: HandnoteContext, els: El[]): boolean;
+  run(ctx: HandnoteContext, els: El[]): void | Promise<void>;
+}
+
 export interface FeatureProps<S> {
   ctx: HandnoteContext;
   settings: S;
@@ -62,6 +81,10 @@ export interface HandnoteFeature<S extends Record<string, unknown> = Record<stri
   Overlay?: ComponentType<FeatureProps<S>>;
   /** Extra section at the bottom of the pen/highlighter panel. */
   InkPanelSection?: ComponentType<FeatureProps<S>>;
+  /** Buttons added to the top bar. */
+  toolbarButtons?: ToolbarButton[];
+  /** Actions offered when something is selected. */
+  selectionActions?: SelectionAction[];
 }
 
 /** Helper that keeps the generic type when declaring a feature. */

@@ -65,7 +65,7 @@ export default defineFeature<S>({
     /** Window capture: runs first, does the work. */
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch" || !ctx.root.contains(e.target as Node)) return;
-      if ((e.target as HTMLElement).tagName !== "CANVAS") return;
+      if ((e.target as HTMLElement).tagName !== "CANVAS" || ctx.claimedTouches.has(e.pointerId)) return;
       touches.set(e.pointerId, { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, t: e.timeStamp });
       panning = false;
       if (touches.size === 1) tap = { start: e.timeStamp, count: 1, moved: false };
@@ -122,7 +122,8 @@ export default defineFeature<S>({
 
     /** Root capture: keeps Excalidraw from also reacting to the same fingers. */
     const block = (e: PointerEvent) => {
-      if (e.pointerType === "touch" && owns() && (e.target as HTMLElement)?.tagName === "CANVAS") e.stopPropagation();
+      if (e.pointerType === "touch" && (owns() || ctx.claimedTouches.has(e.pointerId)) && (e.target as HTMLElement)?.tagName === "CANVAS")
+        e.stopPropagation();
     };
     const blockTouch = (e: TouchEvent) => {
       if (owns()) e.stopPropagation();

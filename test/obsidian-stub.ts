@@ -8,7 +8,8 @@ const ICONS: Record<string, string> = {
   "undo-2": "↶", "redo-2": "↷", notebook: "▤", shapes: "◆", "trash-2": "🗑", lasso: "◌",
   "more-horizontal": "…", move: "✥", star: "★", "pen-tool": "✒", pen: "🖊", pencil: "✏",
   type: "T", scan: "⬚", plus: "+", "file-plus": "⊕", "file-down": "⤓", folder: "📁",
-  "notebook-pen": "📓", "folder-plus": "📁+", "file-text": "📄",
+  "notebook-pen": "📓", "folder-plus": "📁+", "file-text": "📄", "list-tree": "☰", ruler: "📏",
+  link: "🔗", unlink: "⛓", sigma: "Σ", "heading-1": "H1", "heading-2": "H2", "heading-3": "H3", heading: "H",
 };
 export function setIcon(el: HTMLElement, name: string) {
   el.textContent = ICONS[name] ?? "?";

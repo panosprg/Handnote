@@ -9,6 +9,11 @@ import cursor from "./cursor";
 import eraseEffect from "./erase-effect";
 import erasers from "./erasers";
 import gestures from "./gestures";
+import headings from "./headings";
+import links from "./links";
+import maths from "./maths";
+import recognition from "./recognition";
+import ruler from "./ruler";
 import highlighterBehind from "./highlighter-behind";
 import lasso from "./lasso";
 import radialMenu from "./radial-menu";
@@ -28,6 +33,11 @@ export const BUILT_IN_FEATURES: HandnoteFeature<any>[] = [
   eraseEffect,
   cleanSelection,
   cursor,
+  headings,
+  links,
+  maths,
+  recognition,
+  ruler, // before gestures: it claims the fingers that land on it
   gestures,
   radialMenu,
 ];

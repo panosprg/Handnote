@@ -342,6 +342,67 @@ with sync_playwright() as p:
     tap(page, "Fountain pen")
     page.screenshot(path=str(OUT / "toolbar.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 80})
 
+    # ---------- headings, outline, recognition, links, maths ----------
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: -1200}})"); page.wait_for_timeout(150)
+    page.evaluate("store.updateFeature('handwriting-recognition', {appKey: 'test-app', hmacKey: 'test-hmac'})")
+    pen_stroke(cdp, [(300 + k * 4, 300 + 12 * math.sin(k / 3)) for k in range(50)], page)
+    tap(page, "Lasso")
+    loop = [(400 + 140 * math.cos(t / 30 * 2 * math.pi), 300 + 45 * math.sin(t / 30 * 2 * math.pi)) for t in range(32)]
+    pen_stroke(cdp, loop, page, delay=6, settle=300)
+    bar = page.evaluate("[...document.querySelectorAll('.hn-selbar-btn span:last-child')].map(b => b.textContent)")
+    check("selection bar offers headings and links", all(x in bar for x in ["Title", "Subtitle", "Heading 3", "Link to note"]), str(bar))
+    check("Solve appears once recognition keys are set", "Solve" in bar)
+    page.click(".hn-selbar-btn:has-text('Title')"); page.wait_for_timeout(400)
+    req = page.evaluate("window.lastRequest")
+    check("heading is sent for recognition with signed request", req and req["headers"]["hmac"] and len(req["headers"]["hmac"]) == 128
+          and req["body"]["contentType"] == "Text" and len(req["body"]["strokeGroups"][0]["strokes"]) == 1)
+    page.click(".hn-toolbar [aria-label='Outline']"); page.wait_for_timeout(300)
+    items = page.evaluate("[...document.querySelectorAll('.hn-outline-item')].map(i => i.textContent)")
+    check("outline lists the heading as text", len(items) == 1 and "Lecture 1 overview" in items[0], str(items))
+    page.screenshot(path=str(OUT / "outline.png"))
+    page.evaluate("api.updateScene({appState: {scrollY: -5000}})")
+    page.click(".hn-outline-item"); page.wait_for_timeout(150)
+    sy = page.evaluate("api.getAppState().scrollY")
+    check("tapping an outline entry jumps to it", abs(sy - (820 / 4 - (300 - 12 + 1200))) < 40, f"scrollY {sy:.0f}")
+    page.click(".hn-toolbar [aria-label='Outline']"); page.wait_for_timeout(100)
+    # link
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: -1200}})"); page.wait_for_timeout(100)
+    tap(page, "Lasso"); pen_stroke(cdp, loop, page, delay=6, settle=300)
+    page.click(".hn-selbar-btn:has-text('Link to note')", timeout=5000); page.wait_for_timeout(300)
+    check("linked writing gets a chip with the note's name", page.locator(".hn-link-chip:has-text('Week 1 summary')").count() == 1)
+    page.click(".hn-link-chip"); page.wait_for_timeout(100)
+    check("tapping the chip opens the note", page.evaluate("window.openedLink") == "[[Week 1 summary]]")
+    # maths
+    tap(page, "Fountain pen")
+    page.evaluate("api.updateScene({appState: {selectedElementIds: {}, selectedGroupIds: {}}})")
+    pen_stroke(cdp, [(300 + k * 4, 520 + 10 * math.sin(k / 2)) for k in range(40)], page)
+    tap(page, "Lasso")
+    loop2 = [(380 + 110 * math.cos(t / 30 * 2 * math.pi), 520 + 40 * math.sin(t / 30 * 2 * math.pi)) for t in range(32)]
+    pen_stroke(cdp, loop2, page, delay=6, settle=300)
+    page.click(".hn-selbar-btn:has-text('Solve')"); page.wait_for_timeout(400)
+    ans = page.evaluate("api.getSceneElements().filter(e => e.customData?.hn === 'maths-answer').map(e => e.text)")
+    check("Solve writes the answer next to the maths", ans == ["x = 2, x = 3"], str(ans))
+    page.screenshot(path=str(OUT / "maths.png"))
+    # ruler
+    tap(page, "Fountain pen")
+    page.click(".hn-toolbar [aria-label='Ruler']"); page.wait_for_timeout(150)
+    check("ruler appears", page.locator(".hn-ruler").count() == 1)
+    rb = page.evaluate("(() => { const r = document.querySelector('.hn-ruler').getBoundingClientRect(); return [r.x, r.y, r.width, r.height] })()")
+    edge_y = rb[1] + rb[3] + 10  # just below the bottom edge
+    pen_stroke(cdp, [(rb[0] + 40 + i * 8, edge_y + random.Random(i).uniform(-6, 6)) for i in range(50)], page)
+    ys = [p[1] for p in last_freedraw(page)["pts"]]
+    check("writing along the ruler gives a straight line", max(ys) - min(ys) < 0.6, f"height {max(ys) - min(ys):.2f}")
+    sy0 = page.evaluate("api.getAppState().scrollY")
+    cx, cy = rb[0] + rb[2] / 2, rb[1] + rb[3] / 2
+    touch(cdp, "touchStart", [(0, (cx, cy))])
+    for k in range(1, 9):
+        touch(cdp, "touchMove", [(0, (cx + k * 10, cy + k * 12))]); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", []); page.wait_for_timeout(100)
+    rb2 = page.evaluate("(() => { const r = document.querySelector('.hn-ruler').getBoundingClientRect(); return [r.x, r.y] })()")
+    check("a finger on the ruler moves the ruler, not the page",
+          abs(rb2[0] - rb[0] - 80) < 3 and abs(rb2[1] - rb[1] - 96) < 3 and page.evaluate("api.getAppState().scrollY") == sy0)
+    page.screenshot(path=str(OUT / "ruler.png"))
+
     check("no JavaScript errors", not errors, "; ".join(errors[:3]))
     ctx.close()
 

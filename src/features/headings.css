@@ -1,0 +1,94 @@
+/* Outline side panel */
+
+.hn-outline {
+  position: absolute;
+  z-index: 21;
+  left: 12px;
+  top: 72px;
+  bottom: 12px;
+  width: min(300px, calc(100% - 24px));
+  border-radius: 20px;
+  padding: 12px 10px;
+  overflow-y: auto;
+  animation: hn-pop 0.18s ease;
+}
+
+.hn-outline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 8px 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.hn-outline-empty {
+  padding: 8px;
+  font-size: 13px;
+  color: var(--hn-muted);
+  line-height: 1.45;
+}
+
+.hn-root button.hn-outline-item {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.hn-root button.hn-outline-item:active {
+  background: var(--hn-active);
+}
+.hn-root button.hn-outline-item.hn-level-2 {
+  padding-left: 22px;
+}
+.hn-root button.hn-outline-item.hn-level-3 {
+  padding-left: 36px;
+}
+
+.hn-outline-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hn-level-1 .hn-outline-text {
+  font-weight: 700;
+  font-size: 15px;
+}
+.hn-level-2 .hn-outline-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+.hn-level-3 .hn-outline-text {
+  font-size: 13px;
+}
+
+.hn-outline-snap {
+  display: block;
+  max-width: 190px;
+  max-height: 34px;
+  object-fit: contain;
+  object-position: left center;
+}
+.hn-level-2 .hn-outline-snap {
+  max-height: 28px;
+}
+.hn-level-3 .hn-outline-snap {
+  max-height: 22px;
+}
+.hn-dark .hn-outline-snap {
+  filter: invert(93%) hue-rotate(180deg);
+}
+
+.hn-outline-page {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--hn-muted);
+  font-variant-numeric: tabular-nums;
+}

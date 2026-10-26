@@ -50,6 +50,12 @@ const mount = (raw: string, images: (string | undefined)[] = []) => {
       host={{
         notePath: () => "Test.handnote",
         openLink: (l: string) => (w.openedLink = l),
+        pickNote: async () => "[[Week 1 summary]]",
+        request: async (url: string, init: any) => {
+          w.lastRequest = { url, ...init, body: JSON.parse(init.body) };
+          const maths = init.headers.Accept === "application/x-latex";
+          return { status: 200, text: maths ? "x^{2}-5x+6=0" : "Lecture 1 overview" };
+        },
         exportPdf: async () => {
           w.exportedPdf = await exportPdf(w.ctx);
         },

@@ -49,6 +49,10 @@ export interface UiState {
 export interface HostActions {
   exportPdf(): Promise<void>;
   openLink(link: string): void;
+  /** Ask the user to pick a note in the vault; resolves to its link text or null. */
+  pickNote(): Promise<string | null>;
+  /** HTTP request without browser CORS limits (Obsidian's requestUrl). */
+  request(url: string, init: { method: string; headers: Record<string, string>; body: string }): Promise<{ status: number; text: string }>;
   /** vault path of this note */
   notePath(): string;
 }
@@ -75,6 +79,8 @@ export class HandnoteContext {
   readonly events = new Emitter<CtxEvents>();
   /** Every ink stroke passes through here; features add filters. */
   readonly pen: PenPipeline;
+  /** Touches a feature has taken (e.g. the ruler): other gestures leave them alone. */
+  readonly claimedTouches = new Set<number>();
   state: UiState;
   private unsub: () => void;
 
@@ -295,6 +301,22 @@ export class HandnoteContext {
       height: Math.max(...ys) - Math.min(...ys),
       lastCommittedPoint: rel[rel.length - 1],
     } as never);
+  }
+
+  /** Currently selected elements (not deleted). */
+  selected(): El[] {
+    const ids = this.api.getAppState().selectedElementIds;
+    return this.elements().filter((e) => ids[e.id]);
+  }
+
+  /** Scroll so a scene point sits in the upper part of the screen. */
+  scrollTo(sceneX: number, sceneY: number) {
+    const st = this.api.getAppState();
+    const z = st.zoom.value;
+    this.api.updateScene({
+      appState: { scrollX: this.root.clientWidth / 2 / z - sceneX, scrollY: this.root.clientHeight / 4 / z - sceneY },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
   }
 
   /** A stroke's points in absolute scene coordinates. */
