@@ -48,4 +48,9 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
    Same colour as the ink, and it updates when the size, pen type or zoom changes. For the highlighter,
    show its width too (a soft bar or ring, not a solid blob). Today it's a fixed-size dot (`cursor.tsx`).
 
+8. **Remove the ☰ button at the top-left of the page.** It's Excalidraw's own main menu
+   (`.main-menu-trigger`) leaking through. Hide it in Handnote mode (keep it only when "Shapes and text"
+   / native Excalidraw UI is on). Check nothing needed is only reachable from it (export, dark mode and
+   clear page already live in Handnote's own menus).
+
 ## Done
