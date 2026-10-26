@@ -1,12 +1,16 @@
-# Builds the plugin and publishes a GitHub release whenever a version tag
-# (e.g. 0.3.0) is pushed. BRAT on your iPad picks the release up automatically.
+# Builds the plugin and publishes a GitHub release whenever the version in
+# manifest.json changes on main (or a version tag is pushed / a release is
+# published on github.com). BRAT on the iPad then installs it automatically.
 name: Release
 
 on:
   push:
+    branches: [main]
+    paths: ["manifest.json", ".github/workflows/release.yml"]
     tags: ["*"]
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -26,10 +30,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VERSION=$(node -p "require('./manifest.json').version")
           FILES="build/main.js build/manifest.json build/styles.css"
-          # Works both for a pushed tag and for a release drafted on github.com.
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" $FILES --clobber
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" $FILES --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" --title "Handnote ${GITHUB_REF_NAME}" --generate-notes $FILES
+            gh release create "$VERSION" --target "$GITHUB_SHA" \
+              --title "Handnote $VERSION" --generate-notes $FILES
           fi

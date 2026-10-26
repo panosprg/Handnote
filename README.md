@@ -17,10 +17,11 @@ Updates arrive automatically once this is set up. You only do it once.
 npm install          # first time only
 npm test             # browser tests with real pen/touch input
 npm version minor    # 0.2.0 → 0.3.0 (use "patch" for fixes)
-git push --follow-tags
+git push
 ```
 
-GitHub Actions builds it and publishes a release (`.github/workflows/release.yml`).
+When the version in `manifest.json` changes on `main`, GitHub Actions builds the plugin and
+publishes the release itself (`.github/workflows/release.yml`).
 Next time Obsidian starts on the iPad, BRAT installs it. Your notes and settings are untouched.
 
 No GitHub? `npm run build`, then copy `build/main.js`, `build/manifest.json` and
