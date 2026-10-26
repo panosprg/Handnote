@@ -115,8 +115,8 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
         </button>
         <button
           className={`hn-btn ${ui.panel === "paper" ? "is-active" : ""}`}
-          aria-label="Paper"
-          title="Paper template"
+          aria-label="Notebook"
+          title="Paper, pages and export"
           onClick={() => ctx.togglePanel("paper")}
         >
           <Icon name="notebook" />

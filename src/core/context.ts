@@ -6,6 +6,7 @@ import { Emitter } from "./emitter";
 import type { FeatureRegistry } from "./registry";
 import { INK_TOOLS, type CoreSettings, type HandnoteSettings, type InkToolId, type SettingsStore, type Template } from "./settings";
 import { PenPipeline } from "./pen";
+import { A4, type PagesInfo } from "./pages";
 import { CORE_TOOLS } from "./tools";
 import type { ToolDef } from "./types";
 
@@ -38,6 +39,18 @@ export interface UiState {
   showNative: boolean;
   /** A menu is open over the page: gestures should stand down */
   modal: boolean;
+  /** The notebook's pages */
+  pages: PagesInfo;
+  /** Background image per page (imported PDFs), as data URLs */
+  pageImages: (string | undefined)[];
+}
+
+/** Things only the Obsidian side can do (files, links), provided by the view. */
+export interface HostActions {
+  exportPdf(): Promise<void>;
+  openLink(link: string): void;
+  /** vault path of this note */
+  notePath(): string;
 }
 
 export interface CtxEvents extends Record<string, unknown[]> {
@@ -70,8 +83,10 @@ export class HandnoteContext {
     readonly root: HTMLElement,
     readonly store: SettingsStore,
     readonly registry: FeatureRegistry,
-    initial: { template: Template },
+    initial: { template: Template; pages: PagesInfo },
     private onTemplateChange: (t: Template) => void,
+    private onPagesChange: (p: PagesInfo) => void,
+    readonly host: HostActions,
   ) {
     this.state = {
       tool: "pen",
@@ -80,6 +95,8 @@ export class HandnoteContext {
       template: initial.template,
       showNative: false,
       modal: false,
+      pages: initial.pages,
+      pageImages: [],
     };
     this.pen = new PenPipeline(this);
     // Re-apply ink settings when colours/sizes change anywhere.
@@ -184,6 +201,21 @@ export class HandnoteContext {
   setTemplate(t: Template) {
     this.setState({ template: t });
     this.onTemplateChange(t);
+  }
+
+  /* ---------- pages ---------- */
+
+  setPages(pages: PagesInfo) {
+    this.setState({ pages });
+    this.onPagesChange(pages);
+  }
+
+  /** Adds a page after `index` (default: at the end), the same size as its neighbour. */
+  addPage(index = this.state.pages.sizes.length - 1) {
+    const sizes = [...this.state.pages.sizes];
+    const like = sizes[index] ?? A4;
+    sizes.splice(index + 1, 0, { w: like.w, h: like.h });
+    this.setPages({ sizes });
   }
 
   /* ---------- history ---------- */

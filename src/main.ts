@@ -1,18 +1,36 @@
 import "@excalidraw/excalidraw/index.css";
 import "./core/styles.css";
-import { App, Notice, Plugin, PluginSettingTab, Setting, TFolder, normalizePath } from "obsidian";
+import { App, FuzzySuggestModal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath } from "obsidian";
 
 import { FeatureRegistry } from "./core/registry";
 import { loadSettings, SettingsStore, type CoreSettings, type Template } from "./core/settings";
 import type { HandnoteFeature } from "./core/types";
 import { emptyNote } from "./data";
 import { BUILT_IN_FEATURES } from "./features";
+import { LibraryView, VIEW_TYPE_LIBRARY } from "./library";
+import { importPdf } from "./pdf-import";
 import { HandnoteView, VIEW_TYPE_HANDNOTE } from "./view";
 
 /** What other plugins get from `app.plugins.plugins.handnote.api`. */
 export interface HandnoteApi {
   version: string;
   registerFeature(feature: HandnoteFeature<any>): () => void;
+}
+
+class PdfPicker extends FuzzySuggestModal<TFile> {
+  constructor(app: App, private pick: (f: TFile) => void) {
+    super(app);
+    this.setPlaceholder("Choose a PDF to write on");
+  }
+  getItems() {
+    return this.app.vault.getFiles().filter((f) => f.extension === "pdf");
+  }
+  getItemText(f: TFile) {
+    return f.path;
+  }
+  onChooseItem(f: TFile) {
+    this.pick(f);
+  }
 }
 
 export default class HandnotePlugin extends Plugin {
@@ -34,30 +52,52 @@ export default class HandnotePlugin extends Plugin {
     };
 
     this.registerView(VIEW_TYPE_HANDNOTE, (leaf) => new HandnoteView(leaf, this));
+    this.registerView(VIEW_TYPE_LIBRARY, (leaf) => new LibraryView(leaf, this));
     this.registerExtensions(["handnote"], VIEW_TYPE_HANDNOTE);
 
     const core = () => this.store.get().core;
-    this.addRibbonIcon("notebook-pen", "New handwritten note", () => this.createNote(core().notesFolder, "Handwritten"));
+    this.addRibbonIcon("library", "Notebooks", () => this.openLibrary());
+    this.addRibbonIcon("notebook-pen", "New notebook", () => this.createNote(core().notesFolder, "Notebook"));
     this.addRibbonIcon("sticky-note", "New quick note", () => this.createNote(core().quickNotesFolder, "Quick note"));
+    this.addCommand({ id: "open-library", name: "Open notebooks library", callback: () => this.openLibrary() });
     this.addCommand({
       id: "new-note",
-      name: "New handwritten note",
-      callback: () => this.createNote(core().notesFolder, "Handwritten"),
+      name: "New notebook",
+      callback: () => this.createNote(core().notesFolder, "Notebook"),
     });
     this.addCommand({
       id: "new-quick-note",
       name: "New quick note",
       callback: () => this.createNote(core().quickNotesFolder, "Quick note"),
     });
+    this.addCommand({ id: "import-pdf", name: "Write on a PDF", callback: () => this.pickPdfToImport() });
+    this.addCommand({
+      id: "export-pdf",
+      name: "Export notebook as PDF",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(HandnoteView);
+        if (!view?.ctx) return false;
+        if (!checking) void view.ctx.host.exportPdf();
+        return true;
+      },
+    });
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (!(file instanceof TFolder)) return;
-        menu.addItem((item) =>
-          item
-            .setTitle("New handwritten note")
-            .setIcon("notebook-pen")
-            .onClick(() => this.createNote(file.path, "Handwritten")),
-        );
+        if (file instanceof TFolder) {
+          menu.addItem((item) =>
+            item
+              .setTitle("New notebook")
+              .setIcon("notebook-pen")
+              .onClick(() => this.createNote(file.path, "Notebook")),
+          );
+        } else if (file instanceof TFile && file.extension === "pdf") {
+          menu.addItem((item) =>
+            item
+              .setTitle("Write on this PDF")
+              .setIcon("notebook-pen")
+              .onClick(() => this.annotatePdf(file)),
+          );
+        }
       }),
     );
 
@@ -79,6 +119,39 @@ export default class HandnotePlugin extends Plugin {
     }, 500);
   }
 
+  async openLibrary() {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LIBRARY)[0];
+    const leaf = existing ?? this.app.workspace.getLeaf("tab");
+    if (!existing) await leaf.setViewState({ type: VIEW_TYPE_LIBRARY, active: true });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  pickPdfToImport() {
+    new PdfPicker(this.app, (f) => this.annotatePdf(f)).open();
+  }
+
+  async annotatePdf(pdf: TFile) {
+    const notice = new Notice(`Handnote: preparing "${pdf.basename}"…`, 0);
+    try {
+      const file = await importPdf(this.app, pdf, (n, total) => notice.setMessage(`Handnote: preparing page ${n} of ${total}…`));
+      notice.hide();
+      await this.app.workspace.getLeaf("tab").openFile(file);
+    } catch (e) {
+      notice.hide();
+      console.error(e);
+      new Notice(`Handnote: couldn't open the PDF (${(e as Error).message})`);
+    }
+  }
+
+  /** Change a notebook's cover colour (library). */
+  async setCover(file: TFile, colour: string) {
+    await this.app.vault.process(file, (raw) => {
+      const j = JSON.parse(raw);
+      j.handnote = { ...(j.handnote ?? {}), cover: colour };
+      return JSON.stringify(j, null, 1);
+    });
+  }
+
   private async ensureFolder(path: string) {
     let current = "";
     for (const part of normalizePath(path).split("/").filter(Boolean)) {
@@ -87,7 +160,7 @@ export default class HandnotePlugin extends Plugin {
     }
   }
 
-  async createNote(folder: string, prefix: string, template: Template = this.store.get().core.defaultTemplate) {
+  async createNote(folder: string, prefix: string, template: Template = this.store.get().core.defaultTemplate, open = true) {
     try {
       const dir = normalizePath(folder || "/");
       if (dir !== "/") await this.ensureFolder(dir);
@@ -100,10 +173,11 @@ export default class HandnotePlugin extends Plugin {
         path = normalizePath(`${base}${prefix} ${stamp} (${i}).handnote`);
       }
       const file = await this.app.vault.create(path, emptyNote(template));
-      await this.app.workspace.getLeaf(true).openFile(file);
+      if (open) await this.app.workspace.getLeaf(true).openFile(file);
+      return file;
     } catch (e) {
       console.error(e);
-      new Notice(`Handnote: couldn't create the note (${(e as Error).message})`);
+      new Notice(`Handnote: couldn't create the notebook (${(e as Error).message})`);
     }
   }
 }

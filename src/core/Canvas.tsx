@@ -3,7 +3,9 @@ import { Excalidraw, getSceneVersion } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import type { HandnoteFile } from "../data";
-import { HandnoteContext, type El } from "./context";
+import { HandnoteContext, type El, type HostActions } from "./context";
+import type { PagesInfo } from "./pages";
+import { fitWidth, Paper, PagesUi, type PaperHandle } from "./Paper";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
 import { BALLPOINT_FILTER } from "./tools";
@@ -14,19 +16,21 @@ export interface CanvasProps {
   store: SettingsStore;
   registry: FeatureRegistry;
   isDark: boolean;
-  onReady(api: ExcalidrawImperativeAPI): void;
+  /** Background images for the pages (imported PDFs), loaded after the note opens. */
+  loadPageImages?: () => Promise<(string | undefined)[]>;
+  host: HostActions;
+  onReady(api: ExcalidrawImperativeAPI, ctx: HandnoteContext | null): void;
   onDirty(): void;
   onTemplateChange(t: Template): void;
+  onPagesChange(p: PagesInfo): void;
 }
-
-const PAPER_SPACING: Record<Template, number> = { blank: 32, lined: 32, grid: 24, dots: 24 };
 
 /**
  * The host: Excalidraw, the paper, and the feature lifecycle.
  * Features never need this file changed; they talk to HandnoteContext.
  */
 export default function Canvas(props: CanvasProps) {
-  const { initial, store, registry, isDark, onReady, onDirty, onTemplateChange } = props;
+  const { initial, store, registry, isDark, onReady, onDirty, onTemplateChange, onPagesChange, host, loadPageImages } = props;
   const settings = useSettings(store);
   useSyncExternalStore(
     (l) => registry.events.on("changed", l),
@@ -34,21 +38,28 @@ export default function Canvas(props: CanvasProps) {
   );
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const paperRef = useRef<HTMLDivElement>(null);
+  const paperRef = useRef<PaperHandle>(null);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [ctx, setCtx] = useState<HandnoteContext | null>(null);
   const lastVersion = useRef(-1);
-  const templateRef = useRef<Template>(initial.handnote.template);
 
   /* ---------- context ---------- */
 
   useEffect(() => {
     if (!api || !rootRef.current) return;
-    const c = new HandnoteContext(api, rootRef.current, store, registry, { template: initial.handnote.template }, (t) => {
-      templateRef.current = t;
-      onTemplateChange(t);
-    });
+    const c = new HandnoteContext(
+      api,
+      rootRef.current,
+      store,
+      registry,
+      { template: initial.handnote.template, pages: initial.handnote.pages },
+      onTemplateChange,
+      onPagesChange,
+      host,
+    );
     setCtx(c);
+    onReady(api, c);
+    loadPageImages?.().then((imgs) => c.setState({ pageImages: imgs }));
     const offBallpoint = c.pen.addFilter(BALLPOINT_FILTER);
     c.tool("pen")!.activate(c);
     return () => {
@@ -63,20 +74,14 @@ export default function Canvas(props: CanvasProps) {
   /* ---------- paper ---------- */
 
   const updatePaper = useCallback((scrollX: number, scrollY: number, zoom: number) => {
-    const el = paperRef.current;
-    if (!el) return;
-    const tpl = templateRef.current;
-    const g = PAPER_SPACING[tpl] * zoom;
-    el.style.backgroundSize = tpl === "lined" ? `100% ${g}px` : `${g}px ${g}px`;
-    el.style.backgroundPosition = `${scrollX * zoom}px ${scrollY * zoom}px`;
+    paperRef.current?.update(scrollX, scrollY, zoom);
   }, []);
 
   useLayoutEffect(() => {
     if (!api) return;
-    templateRef.current = ui?.template ?? templateRef.current;
     const st = api.getAppState();
     updatePaper(st.scrollX, st.scrollY, st.zoom.value);
-  }, [api, ui?.template, updatePaper]);
+  }, [api, ui?.pages, updatePaper]);
 
   /* ---------- core events: stroke end, object eraser ---------- */
 
@@ -163,14 +168,14 @@ export default function Canvas(props: CanvasProps) {
 
   return (
     <div ref={rootRef} className={cls}>
-      <div ref={paperRef} className="hn-paper" />
+      <Paper ref={paperRef} pages={ui?.pages ?? initial.handnote.pages} images={ui?.pageImages} />
       <div className="hn-excalidraw">
         <Excalidraw
           excalidrawAPI={(a) => {
             setApi(a);
-            onReady(a);
+            onReady(a, null);
           }}
-          initialData={{
+          initialData={async () => ({
             elements: initial.elements as never,
             files: initial.files as never,
             appState: {
@@ -183,9 +188,13 @@ export default function Canvas(props: CanvasProps) {
                     scrollY: initial.handnote.scrollY,
                     zoom: { value: (initial.handnote.zoom ?? 1) as never },
                   }
-                : {}),
+                : (() => {
+                    // New notebook: fit the page width to the screen.
+                    const f = fitWidth(initial.handnote.pages, rootRef.current?.clientWidth ?? 800);
+                    return { scrollX: f.scrollX, scrollY: f.scrollY, zoom: { value: f.zoom as never } };
+                  })()),
             },
-          }}
+          })}
           theme={isDark ? "dark" : "light"}
           UIOptions={{
             canvasActions: {
@@ -216,6 +225,7 @@ export default function Canvas(props: CanvasProps) {
           }}
         />
       </div>
+      {ctx && <PagesUi ctx={ctx} />}
       {overlays}
     </div>
   );

@@ -18,6 +18,7 @@
 
 .hn-root {
   --hn-paper: #fdfcf9;
+  --hn-desk: #e7e7ec;
   --hn-line: rgba(70, 110, 170, 0.18);
   --hn-dot: rgba(60, 60, 70, 0.28);
   --hn-glass-bg: rgba(255, 255, 255, 0.34);
@@ -35,6 +36,7 @@
 
 .hn-root.hn-dark {
   --hn-paper: #1c1c1e;
+  --hn-desk: #0c0c0d;
   --hn-line: rgba(140, 170, 220, 0.16);
   --hn-dot: rgba(220, 220, 230, 0.22);
   --hn-glass-bg: rgba(40, 40, 44, 0.42);
@@ -49,30 +51,94 @@
   --hn-active-fg: #0a84ff;
 }
 
-/* ============ Paper ============ */
+/* ============ Paper: a desk with page sheets ============ */
 
-.hn-paper {
+.hn-desk {
   position: absolute;
   inset: 0;
-  background-color: var(--hn-paper);
+  overflow: hidden;
+  background: var(--hn-desk);
   pointer-events: none;
 }
 
-.hn-tpl-lined .hn-paper,
-.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
-  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
+.hn-sheets {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
 }
 
-.hn-tpl-grid .hn-paper,
+.hn-sheet {
+  position: absolute;
+  background-color: var(--hn-paper);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Templates, in page units (they scale with the page). */
+.hn-tpl-lined .hn-sheet,
+.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
+  background-size: 100% 32px;
+}
+.hn-tpl-grid .hn-sheet,
 .hn-paper-opt.hn-tpl-grid .hn-paper-preview {
   background-image:
     linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px)),
     linear-gradient(to right, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
+  background-size: 24px 24px;
 }
-
-.hn-tpl-dots .hn-paper,
+.hn-tpl-dots .hn-sheet,
 .hn-paper-opt.hn-tpl-dots .hn-paper-preview {
   background-image: radial-gradient(circle at 1px 1px, var(--hn-dot) 1.3px, transparent 1.8px);
+  background-size: 24px 24px;
+}
+
+/* Layer above the ink that moves with the pages (add-page button). */
+.hn-sheets-ui {
+  z-index: 4;
+  pointer-events: none;
+}
+.hn-root button.hn-add-page {
+  all: unset;
+  position: absolute;
+  width: 140px;
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 20px;
+  border: 1.5px dashed var(--hn-muted);
+  color: var(--hn-muted);
+  font-size: 14px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.hn-root button.hn-add-page:active {
+  background: var(--hn-active);
+}
+.hn-add-page .hn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hn-page-counter {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 19;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hn-muted);
+  background: var(--hn-glass-top);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
 }
 
 /* ============ Excalidraw integration ============ */
@@ -80,7 +146,27 @@
 .hn-excalidraw {
   position: absolute;
   inset: 0;
-  z-index: 1;
+}
+
+/* The ink blends with the paper like real ink (multiply): a highlighter over
+   printed or handwritten text leaves the text black. Light mode only; dark mode
+   inverts the ink, where multiply would hide it. */
+.hn-light .excalidraw .excalidraw__canvas.static {
+  mix-blend-mode: multiply;
+}
+
+.hn-sheet-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hn-tpl-lined .hn-sheet.hn-sheet-pdf,
+.hn-tpl-grid .hn-sheet.hn-sheet-pdf,
+.hn-tpl-dots .hn-sheet.hn-sheet-pdf {
+  background-image: none;
 }
 
 .hn-root .excalidraw,
@@ -366,4 +452,34 @@
 .hn-root:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-right,
 .hn-root:not(.hn-native) .excalidraw .App-bottom-bar {
   display: none !important;
+}
+
+.hn-root .hn-paper-opt.hn-tpl-lined .hn-paper-preview {
+  background-size: 100% 10px;
+}
+.hn-root .hn-paper-opt.hn-tpl-grid .hn-paper-preview,
+.hn-root .hn-paper-opt.hn-tpl-dots .hn-paper-preview {
+  background-size: 10px 10px;
+}
+
+.hn-root button.hn-chip {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.12);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hn-root button.hn-chip:active,
+.hn-root button.hn-chip.is-active {
+  background: var(--hn-active);
+  color: var(--hn-active-fg);
+}
+.hn-chip .hn-icon svg {
+  width: 16px;
+  height: 16px;
 }

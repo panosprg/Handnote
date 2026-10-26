@@ -73,12 +73,79 @@ with sync_playwright() as p:
         page = ctx.new_page()
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: m.type == "error" and errors.append("console: " + m.text))
         page.goto(URL + query)
         page.wait_for_function("window.api !== undefined")
         page.wait_for_timeout(700)
         return ctx, page, ctx.new_cdp_session(page), errors
 
+    # ---------- pages: new notebook opens fitted to the screen ----------
     ctx, page, cdp, errors = open_page()
+    z = page.evaluate("api.getAppState().zoom.value")
+    check("new notebook fits the page width", abs(z - (1180 - 48) / 794) < 0.02, f"zoom {z:.2f}")
+    check("one A4 page to start", page.locator(".hn-sheet").count() == 1 and page.inner_text(".hn-page-counter").strip() == "1 / 1")
+    page.screenshot(path=str(OUT / "page.png"))
+    page.click("button.hn-add-page"); page.wait_for_timeout(200)
+    check("add page button adds a page", page.locator(".hn-sheet").count() == 2 and page.evaluate("ctx.state.pages.sizes.length") == 2)
+    check("…and saves it", page.evaluate("window.pagesChanges") == 1)
+    # write on page 1 and 2, then export
+    tap(page, "Fountain pen")
+    pen_stroke(cdp, line(300, 200, 700, 260, 30), page)
+    page.evaluate("api.updateScene({appState: {scrollY: api.getAppState().scrollY - 1123}})"); page.wait_for_timeout(100)
+    pen_stroke(cdp, line(300, 300, 700, 300, 30), page)
+    page.click(".hn-toolbar [aria-label='Notebook']"); page.wait_for_timeout(200)
+    page.screenshot(path=str(OUT / "notebook-panel.png"))
+    page.click("button.hn-chip:has-text('Export PDF')")
+    try:
+        page.wait_for_function("window.exportedPdf !== undefined", timeout=20000)
+    except Exception:
+        print("EXPORT TIMEOUT", errors[-5:])
+        raise
+    info = page.evaluate("""(async () => { const d = await PDFDocument.load(window.exportedPdf);
+        return {n: d.getPageCount(), w: d.getPage(0).getWidth(), h: d.getPage(0).getHeight(), bytes: window.exportedPdf.length} })()""")
+    check("export makes a PDF with one A4 page per notebook page", info["n"] == 2 and abs(info["w"] - 595.5) < 1 and abs(info["h"] - 842.25) < 1, str(info))
+    # render page 1 back to check the ink is on it
+    ink = page.evaluate("""(async () => { const { renderPage } = window; return null })()""")
+    check("no JavaScript errors (pages)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # ---------- PDF annotation ----------
+    ctx, page, cdp, errors = open_page("?pdf")
+    page.wait_for_function("window.importedNote !== undefined", timeout=30000)
+    page.wait_for_timeout(800)
+    note = page.evaluate("window.importedNote")
+    check("PDF import makes one notebook page per PDF page", len(note["handnote"]["pages"]["sizes"]) == 2
+          and note["handnote"]["pages"]["sizes"][0] == {"w": 793, "h": 1123}, str(note["handnote"]["pages"]["sizes"]))
+    check("page images saved next to the notebook", all(a["path"].startswith("Lectures/Week 1 (pages)/") for a in note["handnote"]["pdf"]["assets"]))
+    imgs = page.evaluate("[...document.querySelectorAll('.hn-sheet-img')].map(i => i.complete && i.naturalWidth > 0)")
+    check("PDF pages show as the paper", imgs == [True, True], str(imgs))
+    # find the PDF title text on screen ("Lecture slide 1", dark blue) and highlight over it
+    box = page.evaluate("(() => { const r = document.querySelector('.hn-sheet-img').getBoundingClientRect(); return [r.x, r.y, r.width] })()")
+    sx = box[2] / 793
+    tx, ty = box[0] + 100 * sx, box[1] + 110 * sx  # inside the title text area
+    page.screenshot(path=str(OUT / "pdf-before.png"))
+    tap(page, "Highlighter")
+    pen_stroke(cdp, line(box[0] + 70 * sx, ty, box[0] + 560 * sx, ty, 30), page)
+    tap(page, "Fountain pen")
+    pen_stroke(cdp, line(150, 300, 500, 330, 30), page)
+    page.screenshot(path=str(OUT / "pdf.png"))
+    from PIL import Image
+    def darkest(path, x, y, w=int(440 * sx), h=24):
+        im = Image.open(path).convert("L")
+        s = 2  # device scale
+        return min(im.getpixel((int(x * s) + i, int(y * s) + j)) for i in range(0, w * s, 3) for j in range(-h, h, 3))
+    before = darkest(str(OUT / "pdf-before.png"), box[0] + 80 * sx, ty)
+    after = darkest(str(OUT / "pdf.png"), box[0] + 80 * sx, ty)
+    check("highlighting PDF text keeps the text dark", after <= before + 25, f"darkest pixel {before} → {after}")
+    tap(page, "Object eraser")
+    pen_stroke(cdp, line(100, 500, 700, 520, 30), page)
+    check("erasers never touch the PDF page", page.locator(".hn-sheet-img").count() == 2)
+    check("no JavaScript errors (PDF)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    ctx, page, cdp, errors = open_page()
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})")
+    page.wait_for_timeout(150)
 
     # ---------- toolbar ----------
     labels = page.evaluate("[...document.querySelectorAll('.hn-toolbar .hn-btn')].map(b => b.getAttribute('aria-label'))")

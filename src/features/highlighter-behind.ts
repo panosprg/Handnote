@@ -63,10 +63,13 @@ export default defineFeature<S>({
       queueMicrotask(() => {
         mutateElement(fresh as never, { customData: { ...(fresh.customData ?? {}), hn: TAG } } as never);
         const all = ctx.elements(true);
-        const highlights = all.filter(isHighlight);
-        const rest = all.filter((e) => !isHighlight(e));
+        // Order from the back: PDF pages, then highlights, then everything else.
+        const isPage = (e: El) => (e.customData as { hn?: string } | undefined)?.hn === "pdf-page";
+        const pages = all.filter(isPage);
+        const highlights = all.filter((e) => !isPage(e) && isHighlight(e));
+        const rest = all.filter((e) => !isPage(e) && !isHighlight(e));
         // "later" = folded into the stroke's own undo step when the stroke ends.
-        ctx.replaceElements([...highlights, ...rest], "later");
+        ctx.replaceElements([...pages, ...highlights, ...rest], "later");
       });
     });
     return () => {

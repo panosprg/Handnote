@@ -206,7 +206,26 @@ export function PanelHost({
     const P = ctx.activeTool()?.Panel;
     content = P ? <P ctx={ctx} /> : null;
   } else if (st.panel === "paper") {
-    content = <PaperPanel ctx={ctx} />;
+    content = (
+      <>
+        <PaperPanel ctx={ctx} />
+        <div className="hn-label">Notebook</div>
+        <div className="hn-row">
+          <button className="hn-chip" onClick={() => ctx.addPage()}>
+            <Icon name="file-plus" /> Add page
+          </button>
+          <button
+            className="hn-chip"
+            onClick={() => {
+              ctx.setState({ panel: null });
+              void ctx.host.exportPdf();
+            }}
+          >
+            <Icon name="file-down" /> Export PDF
+          </button>
+        </div>
+      </>
+    );
   }
   if (!content) return null;
   return (
