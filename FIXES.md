@@ -53,18 +53,12 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
    / native Excalidraw UI is on). Check nothing needed is only reachable from it (export, dark mode and
    clear page already live in Handnote's own menus).
 
-9. **More page templates (productivity and study).** Today there are blank, lined, grid and dots.
+9. **More page templates (study).** (Planning templates dropped on 26 Oct.) Today there are blank, lined, grid and dots.
    From a quick look at what Goodnotes/Paperlike template packs offer, add:
    - **Cornell notes**: cue column on the left, notes on the right, summary box at the bottom.
      It's the most recommended study layout.
    - **Lecture notes**: header row (course, topic, date), then lined. For Deree classes.
    - **Two-column**: lines on one side, grid on the other. Good for accounting/maths working next to explanations.
-   - **Daily planner**: date, top 3 priorities, time-blocked schedule, to-do list, notes.
-   - **Weekly planner**: 7 day boxes plus a weekly goals/to-do strip.
-   - **To-do / checklist**: rows with tick boxes.
-   - **Eisenhower matrix**: 4 boxes (urgent/important), for prioritising tasks.
-   - **Meeting notes**: attendees, agenda, discussion, action items (who/what/when).
-   - **Habit tracker**: habits × days-of-the-month grid.
    - **Mind map**: centre bubble on dot paper.
    - **Study / revision sheet**: key terms, formulas, summary, questions to review.
    - **Isometric dots**: for 3D sketches and diagrams.
@@ -72,7 +66,7 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
    Notes for building them:
    - Drawn as vector backgrounds like today's templates, so they're sharp at any zoom and in PDF export/print.
    - Light and dark versions, and the paper picker shows a small preview of each.
-   - Per page, not just per notebook: e.g. page 1 a planner, the rest lined.
+   - Per page, not just per notebook: e.g. page 1 a revision sheet, the rest lined.
 
 10. **Remember each notebook's template.** The template you pick must stick to that notebook (and page),
     and come back the same when you reopen it, on any device. Today it can reset.
