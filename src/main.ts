@@ -11,7 +11,7 @@ import { LibraryView, VIEW_TYPE_LIBRARY } from "./library";
 import { importPdf } from "./pdf-import";
 import { HandnoteView, VIEW_TYPE_HANDNOTE } from "./view";
 
-/** What other plugins get from `app.plugins.plugins.handnote.api`. */
+/** What other plugins get from `app.plugins.plugins["panos-handnote"].api`. */
 export interface HandnoteApi {
   version: string;
   registerFeature(feature: HandnoteFeature<any>): () => void;
@@ -39,8 +39,24 @@ export default class HandnotePlugin extends Plugin {
   api!: HandnoteApi;
   private saveTimer: number | null = null;
 
+  /**
+   * Until 0.7 this plugin's id was "handnote", which is also the id of an unrelated plugin in
+   * Obsidian's plugin directory, so Obsidian's updater kept replacing it with that one. The id is
+   * now unique; this brings the settings over from the old folder (only if they're ours).
+   */
+  private async settingsFromOldId(): Promise<unknown> {
+    try {
+      const path = `${this.app.vault.configDir}/plugins/handnote/data.json`;
+      if (!(await this.app.vault.adapter.exists(path))) return null;
+      const data = JSON.parse(await this.app.vault.adapter.read(path));
+      return data && typeof data === "object" && data.core && data.features ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
   async onload() {
-    this.store = new SettingsStore(loadSettings(await this.loadData()), () => this.queueSave());
+    this.store = new SettingsStore(loadSettings((await this.loadData()) ?? (await this.settingsFromOldId())), () => this.queueSave());
     BUILT_IN_FEATURES.forEach((f) => this.registry.register(f));
 
     this.api = {
@@ -53,7 +69,16 @@ export default class HandnotePlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_HANDNOTE, (leaf) => new HandnoteView(leaf, this));
     this.registerView(VIEW_TYPE_LIBRARY, (leaf) => new LibraryView(leaf, this));
-    this.registerExtensions(["handnote"], VIEW_TYPE_HANDNOTE);
+    try {
+      this.registerExtensions(["handnote"], VIEW_TYPE_HANDNOTE);
+    } catch (e) {
+      // Another plugin already opens .handnote files (e.g. the unrelated "HandNote" from the plugin directory).
+      new Notice(
+        "Handnote: another plugin is already opening .handnote files (probably “HandNote” by another author). Disable or uninstall it, then reload Obsidian. Don't open your notebooks with it: it may save them in its own format.",
+        0,
+      );
+      console.error("Handnote: couldn't register the .handnote file type", e);
+    }
 
     const core = () => this.store.get().core;
     this.addRibbonIcon("library", "Notebooks", () => this.openLibrary());

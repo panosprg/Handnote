@@ -32,6 +32,13 @@ Updates arrive automatically once this is set up. You only do it once.
 3. BRAT → *Add beta plugin* → paste the repo URL → enable **Handnote**.
 4. In BRAT's settings, turn on *Auto-update plugins at startup*.
 
+### Plugin id
+
+The plugin id is **`panos-handnote`** (shown as "Handnote (Panos)"). Until 0.7 it was `handnote`, which
+is also the id of an unrelated plugin ("HandNote") in Obsidian's plugin directory, so Obsidian's own
+update check kept replacing this plugin with that one. Never change the id back. Settings from the old
+`handnote` folder are brought over automatically the first time 0.7 starts.
+
 ## Releasing a new version (on your computer)
 
 ```bash
@@ -47,7 +54,7 @@ publishes the release itself (`.github/workflows/release.yml`).
 Next time Obsidian starts on the iPad, BRAT installs it. Your notes and settings are untouched.
 
 No GitHub? `npm run build`, then copy `build/main.js`, `build/manifest.json` and
-`build/styles.css` into `<vault>/.obsidian/plugins/handnote/` and toggle the plugin off and on.
+`build/styles.css` into `<vault>/.obsidian/plugins/panos-handnote/` and toggle the plugin off and on.
 
 ## How it's built
 
@@ -109,7 +116,7 @@ If it crashes, only it is switched off for that note; the page keeps working.
 A separate Obsidian plugin can add features without touching Handnote at all:
 
 ```ts
-const handnote = this.app.plugins.plugins["handnote"]?.api;
+const handnote = this.app.plugins.plugins["panos-handnote"]?.api;
 const remove = handnote?.registerFeature(myFeature);
 this.register(() => remove?.());
 ```

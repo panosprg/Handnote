@@ -11,7 +11,7 @@ import type { El, HandnoteContext } from "./context";
  *  it can be switched off there, and nothing else needs to change.
  *
  *  Other Obsidian plugins can add features too, at runtime:
- *    app.plugins.plugins.handnote.api.registerFeature(myFeature)
+ *    app.plugins.plugins["panos-handnote"].api.registerFeature(myFeature)
  * ============================================================
  */
 
