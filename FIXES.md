@@ -43,4 +43,9 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 6. **Same for the erasers.** One **Eraser** button in the top bar instead of two. Precision /
    object chosen in its menu (like Line options), and its quick sizes are also the ones you pick, max 3.
 
+7. **Pencil-tip dot = the pen's real size.** The hover dot under the Pencil tip should be exactly as
+   wide as the line that pen will draw: the selected mm size × current zoom (so it grows when you zoom in).
+   Same colour as the ink, and it updates when the size, pen type or zoom changes. For the highlighter,
+   show its width too (a soft bar or ring, not a solid blob). Today it's a fixed-size dot (`cursor.tsx`).
+
 ## Done
