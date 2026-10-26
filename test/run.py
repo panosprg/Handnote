@@ -335,6 +335,16 @@ with sync_playwright() as p:
     page.wait_for_timeout(200)
     check("two-finger tap undoes", len(els(page)) == n1 - 1)
 
+    # ---------- iPad: touches on the page are cancelled (stops Scribble delaying the Pencil) ----------
+    tap(page, "Pen")
+    prevented = page.evaluate("""(() => { const c = document.querySelector('canvas.excalidraw__canvas.interactive');
+        const t = new Touch({ identifier: 9, target: c, clientX: 500, clientY: 500 });
+        const ev = new TouchEvent('touchstart', { touches: [t], changedTouches: [t], targetTouches: [t], bubbles: true, cancelable: true });
+        c.dispatchEvent(ev); const ev2 = new TouchEvent('touchend', { touches: [], changedTouches: [t], bubbles: true, cancelable: true }); c.dispatchEvent(ev2);
+        return ev.defaultPrevented })()""")
+    check("touches on the page are cancelled while writing (iPad Scribble can't hold the Pencil back)", prevented)
+    tap(page, "Fountain pen")
+
     # ---------- swipe up past the last page to add one ----------
     pages0 = page.evaluate("ctx.state.pages.sizes.length")
     page.evaluate(f"api.updateScene({{appState: {{zoom: {{value: 1}}, scrollX: 0, scrollY: 700 - {pages0} * 1159 + 36}}}})"); page.wait_for_timeout(150)

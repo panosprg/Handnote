@@ -65,6 +65,8 @@ export class PenPipeline {
   constructor(private ctx: HandnoteContext) {
     this.wetInk = new WetInk(ctx);
     ctx.root.addEventListener("pointerdown", this.onDown, true);
+    ctx.root.addEventListener("touchstart", this.onStylusTouch, { capture: true, passive: false });
+    ctx.root.addEventListener("touchmove", this.onStylusTouch, { capture: true, passive: false });
     window.addEventListener("pointermove", this.onMove, true);
     window.addEventListener("pointerup", this.onUp, true);
     window.addEventListener("pointercancel", this.onCancel, true);
@@ -73,6 +75,8 @@ export class PenPipeline {
   destroy() {
     this.wetInk.destroy();
     this.ctx.root.removeEventListener("pointerdown", this.onDown, true);
+    this.ctx.root.removeEventListener("touchstart", this.onStylusTouch, { capture: true });
+    this.ctx.root.removeEventListener("touchmove", this.onStylusTouch, { capture: true });
     window.removeEventListener("pointermove", this.onMove, true);
     window.removeEventListener("pointerup", this.onUp, true);
     window.removeEventListener("pointercancel", this.onCancel, true);
@@ -115,6 +119,19 @@ export class PenPipeline {
     }
     return cur;
   }
+
+  /**
+   * The Apple Pencil also sends touch events. If they aren't cancelled, iPadOS Scribble
+   * (handwriting-to-text) holds the Pencil's movements back while it decides whether you're
+   * writing into a text field: the ink appears up to a second late, or strokes get cut.
+   * Excalidraw does the same on iPad; this makes sure it happens whatever else
+   * is listening.
+   */
+  private onStylusTouch = (e: TouchEvent) => {
+    if (!e.cancelable || (e.target as HTMLElement)?.tagName !== "CANVAS") return;
+    const stylus = [...Array.from(e.changedTouches)].some((t) => (t as Touch & { touchType?: string }).touchType === "stylus");
+    if (stylus || this.active) e.preventDefault();
+  };
 
   private onDown = (e: PointerEvent) => {
     if (!e.isTrusted || e.pointerType === "touch" || e.button !== 0) return;

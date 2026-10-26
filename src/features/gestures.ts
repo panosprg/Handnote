@@ -169,8 +169,13 @@ export default defineFeature<S>({
       if (e.pointerType === "touch" && (owns() || ctx.claimedTouches.has(e.pointerId)) && (e.target as HTMLElement)?.tagName === "CANVAS")
         e.stopPropagation();
     };
+    // Excalidraw cancels the browser's touch handling on iPad (that's what stops iPadOS
+    // Scribble from holding back Pencil input). We stop these events reaching Excalidraw,
+    // so we must cancel them ourselves.
     const blockTouch = (e: TouchEvent) => {
-      if (owns()) e.stopPropagation();
+      if (!owns()) return;
+      e.stopPropagation();
+      if (e.cancelable && (e.target as HTMLElement)?.tagName === "CANVAS") e.preventDefault();
     };
 
     window.addEventListener("pointerdown", onDown, true);
@@ -178,8 +183,9 @@ export default defineFeature<S>({
     window.addEventListener("pointerup", onUp, true);
     window.addEventListener("pointercancel", onUp, true);
     for (const t of ["pointerdown", "pointermove", "pointerup"] as const) ctx.root.addEventListener(t, block, true);
-    ctx.root.addEventListener("touchstart", blockTouch, true);
-    ctx.root.addEventListener("touchmove", blockTouch, true);
+    const opts = { capture: true, passive: false };
+    ctx.root.addEventListener("touchstart", blockTouch, opts);
+    ctx.root.addEventListener("touchmove", blockTouch, opts);
     return () => {
       hint.remove();
       window.removeEventListener("pointerdown", onDown, true);
@@ -187,8 +193,8 @@ export default defineFeature<S>({
       window.removeEventListener("pointerup", onUp, true);
       window.removeEventListener("pointercancel", onUp, true);
       for (const t of ["pointerdown", "pointermove", "pointerup"] as const) ctx.root.removeEventListener(t, block, true);
-      ctx.root.removeEventListener("touchstart", blockTouch, true);
-      ctx.root.removeEventListener("touchmove", blockTouch, true);
+      ctx.root.removeEventListener("touchstart", blockTouch, opts);
+      ctx.root.removeEventListener("touchmove", blockTouch, opts);
     };
   },
 });
