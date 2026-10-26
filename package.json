@@ -1,6 +1,6 @@
 {
   "name": "handnote",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Handwritten notes for Obsidian on iPad, built on Excalidraw",
   "main": "index.js",
   "scripts": {
