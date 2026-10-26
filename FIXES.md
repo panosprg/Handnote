@@ -11,4 +11,10 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
      line's thickness no longer matches what was drawn. Check it against every highlighter size
      (3/5/8 mm and the slider), and that the straight line matches the width shown while drawing.
 
+2. **Zooming out stops at full page size.** Pinching out must stop when the page fills the screen
+   width (like Goodnotes), not keep shrinking it. Today the minimum is 25 % (`MIN_ZOOM` in `gestures.ts`).
+   - Work out the limit from the widest page and the screen width (the `fitWidth` helper in `Paper.tsx`),
+     and recalculate it when the iPad rotates or Obsidian's sidebar opens/closes.
+   - Make the zoom gently settle at that limit, and apply it to any other zoom-out path too (Excalidraw's own wheel/keyboard zoom).
+
 ## Done
