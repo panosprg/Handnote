@@ -38,7 +38,7 @@
   box-shadow: none !important;
 }
 .hn-arc-band.hn-glass {
-  background: var(--hn-glass-bg);
+  background: linear-gradient(180deg, var(--hn-glass-top), var(--hn-glass-bg));
 }
 
 .hn-arc-shadow path {
@@ -167,8 +167,8 @@
 }
 
 /* Arc style: Excalidraw's own footer would collide with the palette. */
-.hn-style-arc:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-left,
-.hn-style-arc:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-right,
-.hn-style-arc:not(.hn-native) .excalidraw .App-bottom-bar {
+.hn-root:not(.hn-style-classic):not(.hn-native) .excalidraw .layer-ui__wrapper__footer-left,
+.hn-root:not(.hn-style-classic):not(.hn-native) .excalidraw .layer-ui__wrapper__footer-right,
+.hn-root:not(.hn-style-classic):not(.hn-native) .excalidraw .App-bottom-bar {
   display: none !important;
 }

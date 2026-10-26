@@ -186,9 +186,21 @@ export function PaperPanel({ ctx }: { ctx: HandnoteContext }) {
 }
 
 /** Renders whichever panel is open; toolbars decide where it sits. */
-export function PanelHost({ ctx, className, style }: { ctx: HandnoteContext; className?: string; style?: React.CSSProperties }) {
+export function PanelHost({
+  ctx,
+  className,
+  style,
+  only,
+}: {
+  ctx: HandnoteContext;
+  className?: string;
+  style?: React.CSSProperties;
+  /** Render only these panels (when two toolbars share the page). */
+  only?: string[];
+}) {
   const st = useCtxState(ctx);
   useSettings(ctx.store);
+  if (only && st.panel && !only.includes(st.panel)) return null;
   let content: ReactNode = null;
   if (st.panel === "tool") {
     const P = ctx.activeTool()?.Panel;

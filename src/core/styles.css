@@ -20,7 +20,8 @@
   --hn-paper: #fdfcf9;
   --hn-line: rgba(70, 110, 170, 0.18);
   --hn-dot: rgba(60, 60, 70, 0.28);
-  --hn-glass-bg: rgba(255, 255, 255, 0.58);
+  --hn-glass-bg: rgba(255, 255, 255, 0.34);
+  --hn-glass-top: rgba(255, 255, 255, 0.62);
   --hn-glass-border: rgba(255, 255, 255, 0.75);
   --hn-glass-highlight: rgba(255, 255, 255, 0.9);
   --hn-glass-shadow: 0 10px 30px rgba(20, 30, 50, 0.14), 0 2px 6px rgba(20, 30, 50, 0.08);
@@ -36,7 +37,8 @@
   --hn-paper: #1c1c1e;
   --hn-line: rgba(140, 170, 220, 0.16);
   --hn-dot: rgba(220, 220, 230, 0.22);
-  --hn-glass-bg: rgba(44, 44, 48, 0.55);
+  --hn-glass-bg: rgba(40, 40, 44, 0.42);
+  --hn-glass-top: rgba(70, 70, 76, 0.55);
   --hn-glass-border: rgba(255, 255, 255, 0.12);
   --hn-glass-highlight: rgba(255, 255, 255, 0.16);
   --hn-glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -99,14 +101,16 @@
 /* ============ Glass ============ */
 
 .hn-glass {
-  background: var(--hn-glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  backdrop-filter: blur(22px) saturate(180%);
-  border: 0.5px solid var(--hn-glass-border);
+  /* Liquid-glass look: translucent sheen, strong blur, bright rim, soft lift */
+  background: linear-gradient(180deg, var(--hn-glass-top), var(--hn-glass-bg));
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--hn-glass-border);
   box-shadow:
     var(--hn-glass-shadow),
-    inset 0 1px 0 var(--hn-glass-highlight),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+    inset 0 1px 1px var(--hn-glass-highlight),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.25);
 }
 
 .hn-solid {

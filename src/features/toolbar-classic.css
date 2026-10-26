@@ -1,7 +1,8 @@
 /* Classic toolbar (top of the page) */
 
 /* Make room for the toolbar above Excalidraw's own top bar. */
-.hn-style-classic .excalidraw .App-menu_top {
+.hn-style-classic .excalidraw .App-menu_top,
+.hn-style-both .excalidraw .App-menu_top {
   margin-top: 60px;
 }
 

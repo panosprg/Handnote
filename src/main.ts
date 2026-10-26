@@ -138,7 +138,7 @@ class HandnoteSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Appearance").setHeading();
     new Setting(containerEl).setName("Toolbar style").addDropdown((d) =>
       d
-        .addOptions({ arc: "Curved palette", classic: "Classic (top bar)" })
+        .addOptions({ both: "Top bar + curved palette", arc: "Curved palette only", classic: "Top bar only" })
         .setValue(s.core.toolbarStyle)
         .onChange((v) => setCore({ toolbarStyle: v as ToolbarStyle })),
     );

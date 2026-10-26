@@ -7,15 +7,17 @@ import "./toolbar-classic.css";
 function Toolbar({ ctx }: { ctx: HandnoteContext }) {
   const core = useSettings(ctx.store).core;
   const ui = useCtxState(ctx);
-  if (core.toolbarStyle !== "classic") return null;
+  if (core.toolbarStyle === "arc") return null;
+  // Next to the curved palette, the top bar skips what the palette already has.
+  const compact = core.toolbarStyle === "both";
 
   const glass = glassClass(ctx);
   const ink = core[ctx.inkTarget()];
 
   return (
     <>
-      <div className={`hn-toolbar ${glass}`} onPointerDown={(e) => e.stopPropagation()}>
-        {ctx.tools().map((t) => (
+      <div className={`hn-toolbar ${glass} ${compact ? "hn-toolbar-compact" : ""}`} onPointerDown={(e) => e.stopPropagation()}>
+        {!compact && ctx.tools().map((t) => (
           <button
             key={t.id}
             className={`hn-btn ${ui.tool === t.id ? "is-active" : ""}`}
@@ -26,7 +28,8 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
             <Icon name={t.icon} />
           </button>
         ))}
-        <span className="hn-sep" />
+        {!compact && <span className="hn-sep" />}
+        {!compact && (
         <button
           className="hn-btn"
           aria-label="Colour and size"
@@ -38,7 +41,8 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
         >
           <span className="hn-swatch" style={{ background: ink.color }} />
         </button>
-        {core.favourites.slice(0, 4).map((c, i) => (
+        )}
+        {core.favourites.slice(0, compact ? 8 : 4).map((c, i) => (
           <button
             key={`${c}-${i}`}
             className={`hn-btn hn-fav-quick ${ink.color.toLowerCase() === c.toLowerCase() ? "is-active" : ""}`}
@@ -49,12 +53,16 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
           </button>
         ))}
         <span className="hn-sep" />
-        <button className="hn-btn" aria-label="Undo" title="Undo" onClick={() => ctx.undo()}>
-          <Icon name="undo-2" />
-        </button>
-        <button className="hn-btn" aria-label="Redo" title="Redo" onClick={() => ctx.redo()}>
-          <Icon name="redo-2" />
-        </button>
+        {!compact && (
+          <>
+            <button className="hn-btn" aria-label="Undo" title="Undo" onClick={() => ctx.undo()}>
+              <Icon name="undo-2" />
+            </button>
+            <button className="hn-btn" aria-label="Redo" title="Redo" onClick={() => ctx.redo()}>
+              <Icon name="redo-2" />
+            </button>
+          </>
+        )}
         <button
           className={`hn-btn ${ui.panel === "paper" ? "is-active" : ""}`}
           aria-label="Paper"
@@ -63,6 +71,16 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
         >
           <Icon name="notebook" />
         </button>
+        {compact && (
+          <button
+            className={`hn-btn ${ui.tool === "hand" ? "is-active" : ""}`}
+            aria-label="Hand"
+            title="Hand (move the page with the Pencil)"
+            onClick={() => ctx.setTool(ui.tool === "hand" ? ctx.state.lastInk : "hand")}
+          >
+            <Icon name="hand" />
+          </button>
+        )}
         <button
           className={`hn-btn ${ui.showNative ? "is-active" : ""}`}
           aria-label="Shapes and text"
@@ -72,15 +90,15 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
           <Icon name="shapes" />
         </button>
       </div>
-      <PanelHost ctx={ctx} className="hn-panel-top" />
+      <PanelHost ctx={ctx} className="hn-panel-top" only={compact ? ["paper"] : undefined} />
     </>
   );
 }
 
 export default defineFeature({
   id: "toolbar-classic",
-  name: "Classic toolbar",
-  description: "Straight glass toolbar at the top of the page. (Choose the toolbar style above.)",
+  name: "Top bar",
+  description: "Glass toolbar at the top centre of the page. (Choose the toolbar style above.)",
   optional: false,
   defaults: {},
   Overlay: Toolbar,

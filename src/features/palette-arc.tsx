@@ -96,7 +96,7 @@ function Palette({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
     return () => ro.disconnect();
   }, [ctx]);
 
-  if (core.toolbarStyle !== "arc") return null;
+  if (core.toolbarStyle === "classic") return null;
 
   const tools = ctx.tools().filter((t) => t.id !== "hand");
   const inkColor = core[ctx.inkTarget()].color;
@@ -233,7 +233,7 @@ function Palette({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
         })}
       </div>
 
-      <PanelHost ctx={ctx} className="hn-panel-arc" style={panelStyle} />
+      <PanelHost ctx={ctx} className="hn-panel-arc" style={panelStyle} only={core.toolbarStyle === "both" ? ["tool"] : undefined} />
       {ui.panel === "more" && <MorePanel ctx={ctx} style={panelStyle} onReset={() => ctx.updateFeatureSettings(ID, { x: 0.5, bottom: 16 })} />}
     </>
   );

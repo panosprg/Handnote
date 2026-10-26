@@ -2,7 +2,8 @@ import { useSyncExternalStore } from "react";
 
 export type Template = "blank" | "lined" | "grid" | "dots";
 export type InkToolId = "pen" | "highlighter";
-export type ToolbarStyle = "arc" | "classic";
+/** "both" = glass top bar + curved palette */
+export type ToolbarStyle = "both" | "arc" | "classic";
 
 export interface InkConfig {
   color: string;
@@ -36,7 +37,7 @@ export const DEFAULT_CORE: CoreSettings = {
   notesFolder: "Handwritten",
   quickNotesFolder: "Quick Notes",
   defaultTemplate: "lined",
-  toolbarStyle: "arc",
+  toolbarStyle: "both",
   reduceTransparency: false,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
   highlighter: { color: "#ffe066", width: 6, opacity: 45 },

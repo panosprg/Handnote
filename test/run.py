@@ -66,8 +66,12 @@ with sync_playwright() as p:
 
     ctx, page, cdp, errors = open_page()
 
-    # ---------- palette ----------
+    # ---------- palette + top bar ----------
     check("curved palette is shown", page.locator(".hn-arc").count() == 1)
+    check("glass top bar is shown with it", page.locator(".hn-toolbar.hn-glass").count() == 1)
+    page.click(".hn-toolbar [aria-label='Paper']"); page.wait_for_timeout(250)
+    check("top bar opens the paper panel at the top", page.locator(".hn-panel-top").count() == 1)
+    page.click(".hn-toolbar [aria-label='Paper']"); page.wait_for_timeout(150)
     check("pen is the active tool", tool(page) == "Pen", tool(page))
     labels = page.evaluate("[...document.querySelectorAll('.hn-stick')].map(b => b.getAttribute('aria-label'))")
     check("palette has both erasers", "Precision eraser" in labels and "Object eraser" in labels, ", ".join(labels))
@@ -233,6 +237,7 @@ with sync_playwright() as p:
 
     # ---------- dark ----------
     ctx, page, cdp, errors = open_page("?dark")
+    page.evaluate("document.querySelector('.hn-panel') && 0")
     for i in range(3):
         pen_stroke(cdp, [(300 + i*10 + k*4, 250 + 30*math.sin(k/5) + i*40) for k in range(60)], page)
     page.screenshot(path=str(OUT / "dark.png"))
