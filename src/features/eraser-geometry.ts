@@ -59,7 +59,7 @@ export function eraseAlong(all: El[], a: P, b: P, r: number): { next: El[]; remo
   const next: El[] = [];
 
   for (const el of all) {
-    if (el.isDeleted || el.type !== "freedraw" || !el.points || el.points.length < 2) {
+    if (el.isDeleted || el.locked || el.type !== "freedraw" || !el.points || el.points.length < 2) {
       next.push(el);
       continue;
     }
@@ -118,4 +118,39 @@ export function eraseAlong(all: El[], a: P, b: P, r: number): { next: El[]; remo
     });
   }
   return changed ? { next, removed } : null;
+}
+
+/**
+ * Object eraser: every element the eraser path a→b touches is removed whole.
+ * Locked elements (e.g. PDF page backgrounds) are never touched.
+ */
+export function eraseObjectsAlong(all: El[], a: P, b: P, r: number): { next: El[]; removed: El[] } | null {
+  const removed: El[] = [];
+  const next = all.map((el) => {
+    if (el.isDeleted || el.locked) return el;
+    let hit = false;
+    if (el.type === "freedraw" && el.points && el.points.length) {
+      const reach = r + el.strokeWidth * 1.5;
+      const pts = el.points.map(([x, y]) => ({ x: el.x + x, y: el.y + y }));
+      if (pts.length === 1) hit = distToSegment(pts[0], a, b) <= reach;
+      for (let i = 1; i < pts.length && !hit; i++) hit = segToSeg(pts[i - 1], pts[i], a, b) <= reach;
+    } else {
+      const x1 = Math.min(el.x, el.x + el.width) - r, x2 = Math.max(el.x, el.x + el.width) + r;
+      const y1 = Math.min(el.y, el.y + el.height) - r, y2 = Math.max(el.y, el.y + el.height) + r;
+      const inside = (p: P) => p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2;
+      hit =
+        inside(a) ||
+        inside(b) ||
+        [
+          [{ x: x1, y: y1 }, { x: x2, y: y1 }],
+          [{ x: x2, y: y1 }, { x: x2, y: y2 }],
+          [{ x: x2, y: y2 }, { x: x1, y: y2 }],
+          [{ x: x1, y: y2 }, { x: x1, y: y1 }],
+        ].some(([c, d]) => segmentsIntersect(a, b, c, d));
+    }
+    if (!hit) return el;
+    removed.push(el);
+    return newElementWith(el as never, { isDeleted: true } as never) as unknown as El;
+  });
+  return removed.length ? { next, removed } : null;
 }

@@ -1,9 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 export type Template = "blank" | "lined" | "grid" | "dots";
-export type InkToolId = "pen" | "highlighter";
-/** "both" = glass top bar + curved palette */
-export type ToolbarStyle = "both" | "arc" | "classic";
+export type InkToolId = "pen" | "ballpoint" | "pencil" | "highlighter";
+export const INK_TOOLS: InkToolId[] = ["pen", "ballpoint", "pencil", "highlighter"];
 
 export interface InkConfig {
   color: string;
@@ -15,9 +14,12 @@ export interface CoreSettings {
   notesFolder: string;
   quickNotesFolder: string;
   defaultTemplate: Template;
-  toolbarStyle: ToolbarStyle;
   reduceTransparency: boolean;
+  /** Fountain pen: line width follows Pencil pressure */
   pen: InkConfig;
+  /** Even line width, like a ballpoint */
+  ballpoint: InkConfig;
+  pencil: InkConfig;
   highlighter: InkConfig;
   /** Favourite colours, shared by every tool */
   favourites: string[];
@@ -31,15 +33,16 @@ export interface HandnoteSettings {
   features: Record<string, Record<string, unknown> & { enabled?: boolean }>;
 }
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_CORE: CoreSettings = {
   notesFolder: "Handwritten",
   quickNotesFolder: "Quick Notes",
   defaultTemplate: "lined",
-  toolbarStyle: "both",
   reduceTransparency: false,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
+  ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
+  pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },
   highlighter: { color: "#ffe066", width: 6, opacity: 45 },
   favourites: ["#1e1e1e", "#1971c2", "#e03131", "#2f9e44"],
 };
@@ -68,6 +71,16 @@ export const MAX_FAVOURITES = 8;
 type Raw = Record<string, any>;
 
 const MIGRATIONS: Record<number, (s: Raw) => Raw> = {
+  // 0.3: one stabilization slider for all pens; the curved palette is gone.
+  2: (s) => {
+    const stab = s.features?.stabilizer ?? {};
+    const { pen, ...rest } = stab;
+    return {
+      ...s,
+      version: 3,
+      features: { ...(s.features ?? {}), stabilizer: { ...rest, ...(pen !== undefined ? { writing: pen } : {}) } },
+    };
+  },
   // v1 (Handnote 0.1) was a flat object.
   1: (old) => ({
     version: 2,
@@ -111,8 +124,8 @@ export function loadSettings(raw: Raw | null): HandnoteSettings {
   }
   s = stripUndefined(s);
   const core = { ...DEFAULT_CORE, ...(s.core ?? {}) };
-  core.pen = { ...DEFAULT_CORE.pen, ...(s.core?.pen ?? {}) };
-  core.highlighter = { ...DEFAULT_CORE.highlighter, ...(s.core?.highlighter ?? {}) };
+  for (const k of INK_TOOLS) core[k] = { ...DEFAULT_CORE[k], ...(s.core?.[k] ?? {}) };
+  delete (core as Record<string, unknown>).toolbarStyle;
   return { version: SETTINGS_VERSION, core, features: s.features ?? {} };
 }
 

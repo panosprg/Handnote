@@ -1,0 +1,16 @@
+.hn-lasso-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 16;
+  pointer-events: none;
+}
+.hn-lasso-trail polyline {
+  fill: rgba(0, 122, 255, 0.06);
+  stroke: var(--hn-active-fg);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}

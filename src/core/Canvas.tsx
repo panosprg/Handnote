@@ -6,6 +6,7 @@ import type { HandnoteFile } from "../data";
 import { HandnoteContext, type El } from "./context";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
+import { BALLPOINT_FILTER } from "./tools";
 import { FeatureBoundary } from "./ui";
 
 export interface CanvasProps {
@@ -48,8 +49,12 @@ export default function Canvas(props: CanvasProps) {
       onTemplateChange(t);
     });
     setCtx(c);
+    const offBallpoint = c.pen.addFilter(BALLPOINT_FILTER);
     c.tool("pen")!.activate(c);
-    return () => c.destroy();
+    return () => {
+      offBallpoint();
+      c.destroy();
+    };
   }, [api]);
 
   const subscribeUi = useCallback((l: () => void) => (ctx ? ctx.subscribe(l) : () => {}), [ctx]);
@@ -153,7 +158,6 @@ export default function Canvas(props: CanvasProps) {
     "hn-root",
     `hn-tpl-${template}`,
     isDark ? "hn-dark" : "hn-light",
-    `hn-style-${settings.core.toolbarStyle}`,
     ui?.showNative ? "hn-native" : "",
   ].join(" ");
 

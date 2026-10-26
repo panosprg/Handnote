@@ -1,5 +1,5 @@
 import { useCtxState, type HandnoteContext } from "../core/context";
-import { HIGHLIGHTER_WIDTHS, PEN_WIDTHS, useSettings, type CoreSettings } from "../core/settings";
+import { HIGHLIGHTER_WIDTHS, INK_TOOLS, PEN_WIDTHS, useSettings, type CoreSettings, type InkToolId } from "../core/settings";
 import { defineFeature } from "../core/types";
 import { glassClass, Icon, PanelHost } from "../core/ui";
 import "./toolbar-classic.css";
@@ -14,13 +14,11 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
   const settings = useSettings(ctx.store);
   const core = settings.core;
   const ui = useCtxState(ctx);
-  if (core.toolbarStyle === "arc") return null;
-  // Next to the curved palette, undo/redo live on the palette.
-  const withPalette = core.toolbarStyle === "both";
+  const withPalette = false;
 
   const glass = glassClass(ctx);
   const active = ctx.activeTool();
-  const inkId = active?.ink ? (active.id as "pen" | "highlighter") : null;
+  const inkId = active && INK_TOOLS.includes(active.id as InkToolId) ? (active.id as InkToolId) : null;
   const ink = inkId ? core[inkId] : null;
 
   const setWidth = (w: number) =>

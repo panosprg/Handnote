@@ -11,7 +11,7 @@ export default defineFeature({
   defaults: {},
   setup(ctx) {
     return ctx.events.on("strokeEnd", (stroke, tool) => {
-      if (tool !== "pen" || !isScribble(stroke)) return;
+      if (!["pen", "ballpoint", "pencil"].includes(tool) || !isScribble(stroke)) return;
       const all = ctx.elements();
       const targets = findScribbleTargets(stroke, all) as El[];
       if (!targets.length) return;

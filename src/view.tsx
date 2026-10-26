@@ -78,7 +78,10 @@ export class HandnoteView extends TextFileView {
         scrollY: Math.round(st.scrollY),
         zoom: Math.round(st.zoom.value * 100) / 100,
       },
-      elements: this.api.getSceneElements() as unknown[],
+      // Temporary selection groups (see clean-selection) are never saved.
+      elements: this.api.getSceneElements().map((el) =>
+        el.groupIds.some((g) => g.startsWith("hn-sel-")) ? { ...el, groupIds: el.groupIds.filter((g) => !g.startsWith("hn-sel-")) } : el,
+      ) as unknown[],
       appState: { viewBackgroundColor: "transparent", gridSize: null },
       files: this.api.getFiles() as Record<string, unknown>,
     };

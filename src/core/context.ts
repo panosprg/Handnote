@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from "react";
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction, mutateElement } from "@excalidraw/excalidraw";
 import type { AppState, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { Emitter } from "./emitter";
 import type { FeatureRegistry } from "./registry";
-import type { CoreSettings, HandnoteSettings, InkToolId, SettingsStore, Template } from "./settings";
+import { INK_TOOLS, type CoreSettings, type HandnoteSettings, type InkToolId, type SettingsStore, type Template } from "./settings";
+import { PenPipeline } from "./pen";
 import { CORE_TOOLS } from "./tools";
 import type { ToolDef } from "./types";
 
@@ -48,6 +49,10 @@ export interface CtxEvents extends Record<string, unknown[]> {
   /** Excalidraw onChange (fires a lot: keep handlers cheap). */
   change: [elements: readonly El[], appState: AppState];
   scroll: [scrollX: number, scrollY: number, zoom: number];
+  /** Something was just selected (lasso, etc.). */
+  selectionMade: [];
+  /** The Pencil was held still at the start of a stroke (client coordinates). */
+  penHold: [x: number, y: number];
 }
 
 /**
@@ -55,6 +60,8 @@ export interface CtxEvents extends Record<string, unknown[]> {
  */
 export class HandnoteContext {
   readonly events = new Emitter<CtxEvents>();
+  /** Every ink stroke passes through here; features add filters. */
+  readonly pen: PenPipeline;
   state: UiState;
   private unsub: () => void;
 
@@ -74,11 +81,12 @@ export class HandnoteContext {
       showNative: false,
       modal: false,
     };
+    this.pen = new PenPipeline(this);
     // Re-apply ink settings when colours/sizes change anywhere.
     let lastCore = store.get().core;
     this.unsub = store.subscribe(() => {
       const core = store.get().core;
-      if ((core.pen !== lastCore.pen || core.highlighter !== lastCore.highlighter) && this.activeTool()?.ink) {
+      if (INK_TOOLS.some((k) => core[k] !== lastCore[k]) && this.activeTool()?.ink) {
         this.activeTool()!.activate(this);
       }
       lastCore = core;
@@ -87,6 +95,7 @@ export class HandnoteContext {
 
   destroy() {
     this.unsub();
+    this.pen.destroy();
   }
 
   /* ---------- settings ---------- */
@@ -160,8 +169,8 @@ export class HandnoteContext {
 
   /** The ink tool colour edits apply to (current tool if ink, else the last ink tool). */
   inkTarget(): InkToolId {
-    const t = this.state.tool;
-    return t === "pen" || t === "highlighter" ? t : this.state.lastInk;
+    const t = this.state.tool as InkToolId;
+    return INK_TOOLS.includes(t) ? t : this.state.lastInk;
   }
 
   setInkColor(color: string) {
@@ -204,6 +213,13 @@ export class HandnoteContext {
 
   /* ---------- geometry ---------- */
 
+  /** Scene coordinates → client (event) coordinates. */
+  toClient(sceneX: number, sceneY: number) {
+    const p = this.toScreen(sceneX, sceneY);
+    const rect = this.root.getBoundingClientRect();
+    return { x: p.x + rect.left, y: p.y + rect.top };
+  }
+
   /** Scene coordinates → pixels relative to the page's top-left corner. */
   toScreen(sceneX: number, sceneY: number) {
     const st = this.api.getAppState();
@@ -224,6 +240,46 @@ export class HandnoteContext {
 
   elements(includeDeleted = false): El[] {
     return (includeDeleted ? this.api.getSceneElementsIncludingDeleted() : this.api.getSceneElements()) as unknown as El[];
+  }
+
+  /**
+   * Rewrite a stroke's points (absolute scene coordinates). Used by pen filters
+   * while the stroke is still being drawn, so the change is part of its undo step.
+   */
+  setStrokePoints(el: El, pts: [number, number][], pressures?: number[]) {
+    if (pts.length < 2) return;
+    const [ox, oy] = pts[0];
+    const rel = pts.map(([x, y]) => [x - ox, y - oy] as [number, number]);
+    const xs = rel.map((p) => p[0]);
+    const ys = rel.map((p) => p[1]);
+    mutateElement(el as never, {
+      x: ox,
+      y: oy,
+      points: rel,
+      // No pressures given: keep the stroke's own pressure mode (mouse strokes simulate it).
+      pressures: pressures ?? (el.simulatePressure ? [] : rel.map(() => 0.5)),
+      simulatePressure: pressures ? false : !!el.simulatePressure,
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+      lastCommittedPoint: rel[rel.length - 1],
+    } as never);
+  }
+
+  /** A stroke's points in absolute scene coordinates. */
+  strokePoints(el: El): [number, number][] {
+    return (el.points ?? []).map(([x, y]) => [el.x + x, el.y + y]);
+  }
+
+  /**
+   * Record everything that changed since `before` (a snapshot taken with
+   * `elements(true)`) as ONE undo step. Use it after a gesture that updated the
+   * scene live with `replaceElements(..., "later")`: Excalidraw ignores such
+   * live changes when recording, so the scene is put back and re-applied at once.
+   */
+  commitFrom(before: El[]) {
+    const after = this.elements(true);
+    this.replaceElements(before, "later");
+    this.replaceElements(after, "now");
   }
 
   replaceElements(elements: El[], capture: "now" | "later" | "never" = "now") {

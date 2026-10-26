@@ -3,7 +3,7 @@ import "./core/styles.css";
 import { App, Notice, Plugin, PluginSettingTab, Setting, TFolder, normalizePath } from "obsidian";
 
 import { FeatureRegistry } from "./core/registry";
-import { loadSettings, SettingsStore, type CoreSettings, type Template, type ToolbarStyle } from "./core/settings";
+import { loadSettings, SettingsStore, type CoreSettings, type Template } from "./core/settings";
 import type { HandnoteFeature } from "./core/types";
 import { emptyNote } from "./data";
 import { BUILT_IN_FEATURES } from "./features";
@@ -136,12 +136,6 @@ class HandnoteSettingTab extends PluginSettingTab {
     );
 
     new Setting(containerEl).setName("Appearance").setHeading();
-    new Setting(containerEl).setName("Toolbar style").addDropdown((d) =>
-      d
-        .addOptions({ both: "Top bar + curved palette", arc: "Curved palette only", classic: "Top bar only" })
-        .setValue(s.core.toolbarStyle)
-        .onChange((v) => setCore({ toolbarStyle: v as ToolbarStyle })),
-    );
     new Setting(containerEl)
       .setName("Reduce transparency")
       .setDesc("Solid toolbars instead of glass. Turn on if writing feels laggy.")

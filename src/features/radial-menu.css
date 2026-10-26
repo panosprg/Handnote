@@ -1,90 +1,113 @@
-/* Long-press radial menu */
+/* Quick menu: a glass dial */
 
-.hn-menu-backdrop {
+.hn-dial-backdrop {
   position: absolute;
   inset: 0;
   z-index: 30;
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(0, 0, 0, 0.05);
   animation: hn-fade 0.15s ease;
 }
 
-.hn-menu {
+.hn-dial {
   position: absolute;
-  width: 0;
-  height: 0;
+  animation: hn-dial-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
-.hn-menu-hub {
+.hn-dial-glass {
   position: absolute;
-  left: -14px;
-  top: -14px;
-  width: 28px;
-  height: 28px;
+  inset: 0;
   border-radius: 50%;
-  animation: hn-pop 0.2s ease;
+  /* a ring: the centre stays see-through */
+  -webkit-mask: radial-gradient(circle, transparent 25px, #000 26px);
+  mask: radial-gradient(circle, transparent 25px, #000 26px);
 }
 
-.hn-root button.hn-menu-item {
+.hn-dial-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hn-dial-seg {
+  fill: transparent;
+  stroke: rgba(127, 127, 127, 0.18);
+  stroke-width: 1;
+  transition: fill 0.12s ease;
+}
+.hn-dial-seg.is-active {
+  fill: rgba(127, 127, 127, 0.14);
+}
+.hn-dial-seg.is-hover {
+  fill: var(--hn-active);
+}
+
+.hn-root button.hn-dial-tool {
   all: unset;
-  box-sizing: border-box;
   position: absolute;
-  left: -23px;
-  top: -23px;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   color: var(--hn-text);
-  cursor: pointer;
-  animation: hn-fly 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
-  transition: transform 0.12s ease, background 0.12s ease;
-  -webkit-tap-highlight-color: transparent;
+  pointer-events: none;
+  transition: transform 0.12s ease, color 0.12s ease;
 }
-.hn-root button.hn-menu-item.is-active {
+.hn-root button.hn-dial-tool.is-active {
   color: var(--hn-active-fg);
 }
-.hn-root button.hn-menu-item.is-hover {
-  background: var(--hn-active);
-  box-shadow: 0 0 0 2px var(--hn-active-fg), var(--hn-glass-shadow);
+.hn-root button.hn-dial-tool.is-hover {
+  transform: scale(1.18);
+  color: var(--hn-active-fg);
 }
-.hn-menu-item .hn-swatch {
+.hn-dial-tool .hn-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.hn-root button.hn-dial-color {
+  all: unset;
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.15);
+  transition: transform 0.12s ease;
+}
+.hn-root button.hn-dial-color.is-active {
+  box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 3.5px var(--hn-active-fg);
+}
+.hn-root button.hn-dial-color.is-hover {
+  transform: scale(1.3);
+}
+.hn-dark button.hn-dial-color,
+.hn-dark .hn-dial-hub {
+  filter: invert(93%) hue-rotate(180deg);
+}
+
+.hn-dial-hub {
+  position: absolute;
+  left: calc(50% - 13px);
+  top: calc(50% - 13px);
   width: 26px;
   height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Glass on menu items (their reset above would otherwise strip it). */
-.hn-root button.hn-menu-item.hn-glass {
-  background: var(--hn-glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  backdrop-filter: blur(22px) saturate(180%);
-  border: 0.5px solid var(--hn-glass-border);
-  box-shadow: var(--hn-glass-shadow), inset 0 1px 0 var(--hn-glass-highlight);
-}
-.hn-root button.hn-menu-item.hn-solid {
-  background: var(--hn-solid-bg);
-  box-shadow: var(--hn-glass-shadow);
-}
-.hn-root button.hn-menu-item.is-hover {
-  background: var(--hn-active);
-  box-shadow: 0 0 0 2px var(--hn-active-fg), var(--hn-glass-shadow);
-  scale: 1.15;
-}
-
-
-@keyframes hn-fly {
+@keyframes hn-dial-in {
   from {
     opacity: 0;
-    scale: 0.4;
+    scale: 0.6;
+    rotate: -20deg;
   }
   to {
     opacity: 1;
     scale: 1;
+    rotate: 0deg;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hn-menu-hub,
-  .hn-root button.hn-menu-item {
+  .hn-dial {
     animation: none;
   }
 }

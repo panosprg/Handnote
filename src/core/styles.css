@@ -359,3 +359,11 @@
   padding-left: 12px;
   border-left: 2px solid var(--background-modifier-border, rgba(127, 127, 127, 0.25));
 }
+
+/* Excalidraw's own footer (zoom, undo, help): undo is on the top bar and you
+   zoom by pinching, so it's hidden unless "Shapes and text" is on. */
+.hn-root:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-left,
+.hn-root:not(.hn-native) .excalidraw .layer-ui__wrapper__footer-right,
+.hn-root:not(.hn-native) .excalidraw .App-bottom-bar {
+  display: none !important;
+}
