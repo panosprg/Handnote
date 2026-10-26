@@ -42,6 +42,26 @@ export default defineFeature<S>({
   defaults: { straighten: true },
   settings: [{ key: "straighten", type: "toggle", name: "Straighten highlighter strokes" }],
   setup(ctx, s) {
+    // Fast ink: tag the highlight and put it behind the ink in the same step that adds it.
+    const isPage = (e: El) => (e.customData as { hn?: string } | undefined)?.hn === "pdf-page";
+    const offPlace = ctx.pen.addFilter({
+      id: "highlighter-behind",
+      order: 90,
+      start: () =>
+        ctx.state.tool !== "highlighter"
+          ? null
+          : {
+              finish: (el) => {
+                (el as Record<string, unknown>).customData = { ...((el.customData as object) ?? {}), hn: TAG };
+              },
+              place: (all) => {
+                const pages = all.filter(isPage);
+                const highlights = all.filter((e) => !isPage(e) && isHighlight(e));
+                const rest = all.filter((e) => !isPage(e) && !isHighlight(e));
+                return [...pages, ...highlights, ...rest];
+              },
+            },
+    });
     const offStraight = ctx.pen.addFilter({
       id: "highlighter-straighten",
       order: 70,
@@ -75,6 +95,7 @@ export default defineFeature<S>({
     return () => {
       offStraight();
       offBehind();
+      offPlace();
     };
   },
 });

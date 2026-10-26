@@ -108,6 +108,17 @@ if (q.has("library")) {
     w.importedNote = note;
     mount(json, images);
   });
+} else if (q.has("bare")) {
+  // Plain Excalidraw, no Handnote: a reference point for performance tests.
+  const { Excalidraw } = require("@excalidraw/excalidraw");
+  createRoot(document.getElementById("app")!).render(
+    <div style={{ position: "fixed", inset: 0 }}>
+      <Excalidraw
+        initialData={{ appState: { activeTool: { type: "freedraw" }, penMode: true } }}
+        excalidrawAPI={(a: any) => { w.api = a; w.ctx = {}; w.registry = { all: () => [] }; w.store = { updateFeature() {} }; }}
+      />
+    </div>,
+  );
 } else {
   mount(emptyNote("lined"));
 }

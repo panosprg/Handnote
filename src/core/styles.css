@@ -520,3 +520,58 @@
   width: 16px;
   height: 16px;
 }
+
+/* Fast ink: the stroke being written (see core/wet-ink.ts) */
+.hn-root canvas.hn-wet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.hn-light canvas.hn-wet {
+  mix-blend-mode: multiply;
+}
+
+/* Exact pen size (mm) */
+.hn-mm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hn-root .hn-mm button.hn-mm-step {
+  all: unset;
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  cursor: pointer;
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--hn-text);
+}
+.hn-mm-slider {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--hn-active-fg);
+}
+.hn-mm-value {
+  min-width: 58px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+}
+.hn-mm-preview {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+.hn-mm-preview span {
+  flex: 1;
+  border-radius: 999px;
+}

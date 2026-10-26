@@ -95,8 +95,8 @@ export class HandnoteContext {
     readonly host: HostActions,
   ) {
     this.state = {
-      tool: "pen",
-      lastInk: "pen",
+      tool: "ballpoint",
+      lastInk: "ballpoint",
       panel: null,
       template: initial.template,
       showNative: false,

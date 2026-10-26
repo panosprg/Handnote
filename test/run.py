@@ -149,10 +149,11 @@ with sync_playwright() as p:
 
     # ---------- toolbar ----------
     labels = page.evaluate("[...document.querySelectorAll('.hn-toolbar .hn-btn')].map(b => b.getAttribute('aria-label'))")
-    want = ["Fountain pen", "Ballpoint", "Pencil", "Highlighter", "Precision eraser", "Object eraser", "Lasso", "Rectangle select", "Text"]
+    want = ["Pen", "Fountain pen", "Pencil", "Highlighter", "Precision eraser", "Object eraser", "Lasso", "Rectangle select", "Text"]
     check("top bar has every tool", all(t in labels for t in want), ", ".join(l for l in labels if l))
     check("curved palette is gone", page.locator(".hn-arc").count() == 0)
-    check("fountain pen is active on open", tool(page) == "Fountain pen", str(tool(page)))
+    check("normal pen is first and active on open", tool(page) == "Pen" and labels.index("Pen") < labels.index("Fountain pen"), str(tool(page)))
+    check("colours and sizes have their own bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 6 and page.locator(".hn-optionsbar .hn-fav-quick").count() >= 4)
     check("no panel open on load", page.locator(".hn-panel").count() == 0)
 
     # ---------- pen hover dot ----------
@@ -161,7 +162,7 @@ with sync_playwright() as p:
     check("pen hover shows a dot under the tip", dot["d"] == "block" and "dot" in dot["cls"] and abs(dot["cx"] - 600) < 1.5 and abs(dot["cy"] - 400) < 1.5, str(dot))
 
     # ---------- ballpoint ----------
-    tap(page, "Ballpoint")
+    tap(page, "Pen")
     pen_stroke(cdp, line(250, 180, 700, 180, 40), page, forces=[0.2 + 0.7 * (i % 7) / 6 for i in range(40)])
     bp = last_freedraw(page)
     check("ballpoint ignores pressure (even line)", max(bp["pr"]) - min(bp["pr"]) < 1e-3 and not bp["sim"], f"{min(bp['pr'])}..{max(bp['pr'])}")
@@ -334,13 +335,64 @@ with sync_playwright() as p:
     page.wait_for_timeout(200)
     check("two-finger tap undoes", len(els(page)) == n1 - 1)
 
+    # ---------- swipe up past the last page to add one ----------
+    pages0 = page.evaluate("ctx.state.pages.sizes.length")
+    page.evaluate(f"api.updateScene({{appState: {{zoom: {{value: 1}}, scrollX: 0, scrollY: 700 - {pages0} * 1159 + 36}}}})"); page.wait_for_timeout(150)
+    touch(cdp, "touchStart", [(0, (900, 700))])
+    for k in range(1, 21):
+        touch(cdp, "touchMove", [(0, (900, 700 - k * 22))]); page.wait_for_timeout(12)
+    hint = page.evaluate("(() => { const h = document.querySelector('.hn-pull-hint'); return h.className })()")
+    touch(cdp, "touchEnd", []); page.wait_for_timeout(250)
+    check("pulling up past the last page shows 'let go to add a page'", "is-armed" in hint, hint)
+    check("…and letting go adds a page", page.evaluate("ctx.state.pages.sizes.length") == pages0 + 1)
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})"); page.wait_for_timeout(100)
+
     # ---------- top bar quick options ----------
     tap(page, "Highlighter")
-    check("highlighter sizes in the top bar", page.locator(".hn-toolbar .hn-size-quick").count() == 3)
+    check("highlighter sizes in the top bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 3)
     tap(page, "Precision eraser")
-    check("eraser sizes in the top bar", page.locator(".hn-toolbar .hn-size-quick").count() == 4)
+    check("eraser sizes in the top bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 4)
     tap(page, "Fountain pen")
-    page.screenshot(path=str(OUT / "toolbar.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 80})
+    page.screenshot(path=str(OUT / "toolbar.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 120})
+
+    # ---------- sizes in millimetres ----------
+    tap(page, "Pen")
+    page.click(".hn-optionsbar button[aria-label='Size 0.5 mm']"); page.wait_for_timeout(120)
+    sw = page.evaluate("api.getAppState().currentItemStrokeWidth")
+    check("0.5 mm preset sets the matching line width", abs(sw * 6.5494 / (96 / 25.4) - 0.5) < 0.01, f"strokeWidth {sw:.3f}")
+    check("top bar shows the size in mm", page.inner_text(".hn-optionsbar .hn-mm-chip").strip() == "0.5 mm", page.inner_text(".hn-optionsbar .hn-mm-chip"))
+    pen_stroke(cdp, line(300, 600, 600, 600, 40), page)
+    drawn = page.evaluate("(() => { const a = api.getSceneElements().filter(e => e.type === 'freedraw'); return a[a.length-1].strokeWidth })()")
+    check("strokes use the chosen size", abs(drawn - sw) < 1e-6)
+    page.click(".hn-optionsbar button[aria-label='Exact size']"); page.wait_for_timeout(150)
+    page.evaluate("""() => { const i = document.querySelector('.hn-mm-slider');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '1.2');
+        i.dispatchEvent(new Event('input', { bubbles: true })); }""")
+    page.wait_for_timeout(120)
+    check("exact size slider (1.2 mm)", page.inner_text(".hn-mm-value").strip() == "1.2 mm" and page.inner_text(".hn-optionsbar .hn-mm-chip").strip() == "1.2 mm",
+          page.inner_text(".hn-mm-value"))
+    page.click(".hn-mm-step[aria-label='Thicker']"); page.wait_for_timeout(100)
+    check("+ makes it a step thicker", page.inner_text(".hn-mm-value").strip() == "1.3 mm", page.inner_text(".hn-mm-value"))
+    page.screenshot(path=str(OUT / "size-panel.png"))
+    page.click(".hn-optionsbar button[aria-label='Exact size']"); page.wait_for_timeout(100)
+    tap(page, "Fountain pen")
+
+    # ---------- fast ink ----------
+    n0 = len([e for e in els(page) if e["type"] == "freedraw"])
+    pen_down(cdp, 300, 650)
+    for x, y in line(300, 650, 600, 660, 30)[1:]:
+        pen_move(cdp, x, y); page.wait_for_timeout(8)
+    mid = page.evaluate("""(() => { const c = document.querySelector('canvas.hn-wet'); if (!c) return null;
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return {n, scene: api.getSceneElements().filter(e => e.type === 'freedraw').length} })()""")
+    check("fast ink: stroke shows while writing without touching the scene", mid and mid["n"] > 200 and mid["scene"] == n0, str(mid))
+    pen_up(cdp, 600, 660); page.wait_for_timeout(200)
+    after = page.evaluate("""(() => { const c = document.querySelector('canvas.hn-wet');
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n })()""")
+    check("fast ink: lifting the Pencil commits one stroke and clears the wet layer", len([e for e in els(page) if e["type"] == "freedraw"]) == n0 + 1 and after == 0, str(after))
+    undo(page)
+    check("fast ink: one undo removes the whole stroke", len([e for e in els(page) if e["type"] == "freedraw"]) == n0)
 
     # ---------- headings, outline, recognition, links, maths ----------
     page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: -1200}})"); page.wait_for_timeout(150)

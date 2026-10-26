@@ -10,7 +10,7 @@ import { SelectionBar } from "./SelectionBar";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
 import { BALLPOINT_FILTER } from "./tools";
-import { FeatureBoundary } from "./ui";
+import { FeatureBoundary, reportCrash } from "./ui";
 
 export interface CanvasProps {
   initial: HandnoteFile;
@@ -62,7 +62,7 @@ export default function Canvas(props: CanvasProps) {
     onReady(api, c);
     loadPageImages?.().then((imgs) => c.setState({ pageImages: imgs }));
     const offBallpoint = c.pen.addFilter(BALLPOINT_FILTER);
-    c.tool("pen")!.activate(c);
+    c.tool("ballpoint")!.activate(c);
     return () => {
       offBallpoint();
       c.destroy();
@@ -133,10 +133,11 @@ export default function Canvas(props: CanvasProps) {
         if (off) cleanups.push(off);
       } catch (e) {
         console.error(`Handnote: feature "${f.id}" failed to start`, e);
+        reportCrash(f.id, e);
       }
     }
     // A tool from a feature that was switched off can't stay selected.
-    if (!ctx.tool(ctx.state.tool)) ctx.setTool("pen");
+    if (!ctx.tool(ctx.state.tool)) ctx.setTool("ballpoint");
     return () => cleanups.forEach((c) => c());
   }, [ctx, enabledKey]);
 

@@ -1,7 +1,13 @@
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import { totalHeight } from "../core/pages";
 import { defineFeature } from "../core/types";
+import "./gestures.css";
 
-type S = { oneFingerScroll: boolean; twoFingerUndo: boolean; threeFingerRedo: boolean };
+type S = { oneFingerScroll: boolean; twoFingerUndo: boolean; threeFingerRedo: boolean; pullToAddPage: boolean };
+
+/** Empty space below the last page (px on screen) where the pull starts, and how far to pull. */
+const PULL_START = 90;
+const PULL_LENGTH = 150;
 
 const MOVE_TOLERANCE = 10;
 const MIN_ZOOM = 0.25;
@@ -19,12 +25,14 @@ const MAX_ZOOM = 5;
 export default defineFeature<S>({
   id: "gestures",
   name: "Finger gestures",
-  description: "Scroll with one finger, pinch to zoom, two-finger tap to undo, three-finger tap to redo.",
-  defaults: { oneFingerScroll: true, twoFingerUndo: true, threeFingerRedo: true },
+  description:
+    "Scroll with one finger, pinch to zoom, two-finger tap to undo, three-finger tap to redo. On the last page, swipe up past the end and let go to add a page.",
+  defaults: { oneFingerScroll: true, twoFingerUndo: true, threeFingerRedo: true, pullToAddPage: true },
   settings: [
     { key: "oneFingerScroll", type: "toggle", name: "One finger scrolls" },
     { key: "twoFingerUndo", type: "toggle", name: "Two-finger tap to undo" },
     { key: "threeFingerRedo", type: "toggle", name: "Three-finger tap to redo" },
+    { key: "pullToAddPage", type: "toggle", name: "Swipe up past the last page to add a page" },
   ],
   setup(ctx, s) {
     type T = { sx: number; sy: number; x: number; y: number; t: number };
@@ -54,6 +62,35 @@ export default defineFeature<S>({
     const startPinch = () => {
       const c = centre();
       pinch = { dist: Math.max(1, c.d), zoom: ctx.api.getAppState().zoom.value, cx: c.x, cy: c.y };
+    };
+
+    // Swipe-up-to-add-page hint, shown in the empty space under the last page.
+    const hint = document.createElement("div");
+    hint.className = "hn-pull-hint";
+    hint.innerHTML = `<span class="hn-pull-ring"><span class="hn-pull-plus">+</span></span><span class="hn-pull-text">Pull up to add a page</span>`;
+    ctx.root.appendChild(hint);
+    let pullArmed = false;
+    const pullProgress = () => {
+      const bottom = ctx.toScreen(0, totalHeight(ctx.state.pages)).y;
+      const gap = ctx.root.clientHeight - bottom;
+      return { bottom, p: Math.max(0, Math.min(1, (gap - PULL_START) / PULL_LENGTH)), gap };
+    };
+    const showPull = () => {
+      if (!s().pullToAddPage) return;
+      const { bottom, p, gap } = pullProgress();
+      const visible = gap > PULL_START * 0.6;
+      hint.classList.toggle("is-visible", visible);
+      hint.classList.toggle("is-armed", p >= 1);
+      hint.style.top = `${Math.max(bottom + 24, 0)}px`;
+      hint.style.setProperty("--hn-pull", String(p));
+      const text = hint.querySelector(".hn-pull-text")!;
+      text.textContent = p >= 1 ? "Let go to add a page" : "Pull up to add a page";
+      if (p >= 1 && !pullArmed && navigator.vibrate) navigator.vibrate(8);
+      pullArmed = p >= 1;
+    };
+    const hidePull = () => {
+      hint.classList.remove("is-visible", "is-armed");
+      pullArmed = false;
     };
 
     const view = (zoom: number, scrollX: number, scrollY: number) =>
@@ -100,6 +137,7 @@ export default defineFeature<S>({
         if (panning || Math.hypot(t.x - t.sx, t.y - t.sy) > MOVE_TOLERANCE) {
           panning = true;
           view(st.zoom.value, st.scrollX + dx / st.zoom.value, st.scrollY + dy / st.zoom.value);
+          showPull();
         }
       }
     };
@@ -115,6 +153,12 @@ export default defineFeature<S>({
       if (touches.size >= 2) startPinch();
       else pinch = null;
       if (!touches.size) {
+        if (panning && pullArmed && s().pullToAddPage) {
+          ctx.addPage();
+          hint.classList.add("is-added");
+          setTimeout(() => hint.classList.remove("is-added"), 600);
+        }
+        hidePull();
         panning = false;
         tap = null;
       }
@@ -137,6 +181,7 @@ export default defineFeature<S>({
     ctx.root.addEventListener("touchstart", blockTouch, true);
     ctx.root.addEventListener("touchmove", blockTouch, true);
     return () => {
+      hint.remove();
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove, true);
       window.removeEventListener("pointerup", onUp, true);

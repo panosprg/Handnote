@@ -1,5 +1,5 @@
 import { useCtxState, type HandnoteContext } from "../core/context";
-import { HIGHLIGHTER_WIDTHS, INK_TOOLS, PEN_WIDTHS, useSettings, type CoreSettings, type InkToolId } from "../core/settings";
+import { formatMm, INK_TOOLS, MM_PRESETS, mmToWidth, sameMm, useSettings, widthToMm, type CoreSettings, type InkToolId } from "../core/settings";
 import { defineFeature } from "../core/types";
 import { glassClass, Icon, PanelHost } from "../core/ui";
 import "./toolbar-classic.css";
@@ -26,10 +26,9 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
 
   let options: React.ReactNode = null;
   if (inkId && ink) {
-    const widths = inkId === "highlighter" ? HIGHLIGHTER_WIDTHS : PEN_WIDTHS;
     options = (
       <>
-        {core.favourites.slice(0, 5).map((c, i) => (
+        {core.favourites.slice(0, 8).map((c, i) => (
           <button
             key={`${c}-${i}`}
             className={`hn-btn hn-fav-quick ${ink.color.toLowerCase() === c.toLowerCase() ? "is-active" : ""}`}
@@ -42,7 +41,7 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
         <button
           className={`hn-btn ${ui.panel === "tool" ? "is-active" : ""}`}
           aria-label="All colours"
-          title="All colours, sizes and stabilization"
+          title="Colour palette with shades, sizes and stabilization"
           onClick={() => ctx.togglePanel("tool")}
         >
           <span className="hn-wheel-mini">
@@ -50,29 +49,40 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
           </span>
         </button>
         <span className="hn-sep" />
-        {widths.map((w) => {
-          const d = Math.min(18, 3 + w * (inkId === "highlighter" ? 1.6 : 3.4));
+        {MM_PRESETS[inkId].map((mm, i, all) => {
+          const d = 4 + (i / Math.max(1, all.length - 1)) * 12;
+          const on = sameMm(widthToMm(inkId, ink.width), mm);
           return (
             <button
-              key={w}
-              className={`hn-btn hn-size-quick ${ink.width === w ? "is-active" : ""}`}
-              aria-label={`Size ${w}`}
-              onClick={() => setWidth(w)}
+              key={mm}
+              className={`hn-btn hn-size-quick ${on ? "is-active" : ""}`}
+              aria-label={`Size ${formatMm(mm)}`}
+              title={formatMm(mm)}
+              onClick={() => setWidth(mmToWidth(inkId, mm))}
             >
               <span style={{ width: d, height: d, background: ink.color, opacity: Math.max(0.35, ink.opacity / 100) }} />
             </button>
           );
         })}
+        <button
+          className={`hn-btn hn-mm-chip ${ui.panel === "tool" ? "is-active" : ""}`}
+          aria-label="Exact size"
+          title="Set an exact size in millimetres"
+          onClick={() => ctx.togglePanel("tool")}
+        >
+          {formatMm(widthToMm(inkId, ink.width))}
+        </button>
       </>
     );
-  } else if (active?.id === "precision-eraser") {
-    const size = ctx.featureSettings<{ size: number }>("precision-eraser").size;
+  } else if (active?.id === "precision-eraser" || active?.id === "object-eraser") {
+    const key = active.id === "object-eraser" ? "objectSize" : "size";
+    const size = ctx.featureSettings<Record<string, number>>("erasers")[key];
     options = ERASER_SIZES.map((s) => (
       <button
         key={s}
         className={`hn-btn hn-size-quick ${size === s ? "is-active" : ""}`}
         aria-label={`Eraser size ${s}`}
-        onClick={() => ctx.updateFeatureSettings("precision-eraser", { size: s })}
+        onClick={() => ctx.updateFeatureSettings("erasers", { [key]: s })}
       >
         <span className="hn-eraser-dot" style={{ width: Math.min(20, s * 0.6), height: Math.min(20, s * 0.6) }} />
       </button>
@@ -135,16 +145,15 @@ function Toolbar({ ctx }: { ctx: HandnoteContext }) {
         >
           <Icon name="notebook" />
         </button>
-
-        {options && (
-          <>
-            <span className="hn-sep" />
-            {options}
-          </>
-        )}
       </div>
+      {/* Second bar: colours and sizes for the tool in use, always visible (not lost off the edge). */}
+      {options && (
+        <div className={`hn-optionsbar ${glass}`} onPointerDown={(e) => e.stopPropagation()}>
+          {options}
+        </div>
+      )}
       {/* With the palette on screen, the full pen panel opens by the palette instead. */}
-      <PanelHost ctx={ctx} className="hn-panel-top" only={withPalette ? ["paper"] : undefined} />
+      <PanelHost ctx={ctx} className={options ? "hn-panel-top hn-panel-below-options" : "hn-panel-top"} only={withPalette ? ["paper"] : undefined} />
     </>
   );
 }

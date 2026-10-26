@@ -15,6 +15,8 @@ export interface CoreSettings {
   quickNotesFolder: string;
   defaultTemplate: Template;
   reduceTransparency: boolean;
+  /** Draw the stroke being written on its own canvas (much less lag). */
+  fastInk: boolean;
   /** Fountain pen: line width follows Pencil pressure */
   pen: InkConfig;
   /** Even line width, like a ballpoint */
@@ -40,6 +42,7 @@ export const DEFAULT_CORE: CoreSettings = {
   quickNotesFolder: "Quick Notes",
   defaultTemplate: "lined",
   reduceTransparency: false,
+  fastInk: true,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
   ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
   pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },
@@ -62,6 +65,34 @@ export const PALETTE: { name: string; shades: string[] }[] = [
 
 export const PEN_WIDTHS = [0.5, 1, 1.5, 2.5];
 export const HIGHLIGHTER_WIDTHS = [4, 6, 9];
+
+/* ---------- Sizes in millimetres ----------
+ * Pages are real A4 at 96 px per inch, so a millimetre on the page is a millimetre
+ * on paper when printed or exported. Excalidraw draws a freedraw line
+ * strokeWidth × 4.25 × 2 × sin(t·π/2) px thick, with t = 0.5 − 0.6 × (0.5 − pressure)
+ * (perfect-freehand). Sizes are shown at the tool's typical pressure.
+ */
+export const PX_PER_MM = 96 / 25.4;
+const typicalPressure = (tool: InkToolId) => (tool === "ballpoint" ? 0.6 : 0.5);
+const pxPerWidth = (tool: InkToolId) => 8.5 * Math.sin(((0.5 - 0.6 * (0.5 - typicalPressure(tool))) * Math.PI) / 2);
+export const widthToMm = (tool: InkToolId, width: number) => (width * pxPerWidth(tool)) / PX_PER_MM;
+export const mmToWidth = (tool: InkToolId, mm: number) => (mm * PX_PER_MM) / pxPerWidth(tool);
+/** Quick sizes (mm) for the top bar and the panel. */
+export const MM_PRESETS: Record<InkToolId, number[]> = {
+  pen: [0.3, 0.5, 0.7, 1, 1.5, 2],
+  ballpoint: [0.3, 0.5, 0.7, 1, 1.5, 2],
+  pencil: [0.3, 0.5, 0.7, 1, 1.5, 2],
+  highlighter: [3, 5, 8],
+};
+/** Range of the size slider (mm). */
+export const MM_RANGE: Record<InkToolId, { min: number; max: number; step: number }> = {
+  pen: { min: 0.1, max: 5, step: 0.05 },
+  ballpoint: { min: 0.1, max: 5, step: 0.05 },
+  pencil: { min: 0.1, max: 5, step: 0.05 },
+  highlighter: { min: 1, max: 15, step: 0.5 },
+};
+export const sameMm = (a: number, b: number) => Math.abs(a - b) < 0.005;
+export const formatMm = (mm: number) => `${mm < 1 ? mm.toFixed(2).replace(/0$/, "") : mm.toFixed(1).replace(/\.0$/, "")} mm`;
 export const MAX_FAVOURITES = 8;
 
 /* ------------------------------------------------------------------ */

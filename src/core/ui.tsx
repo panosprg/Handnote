@@ -1,12 +1,16 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
-import { setIcon } from "obsidian";
+import { Notice, setIcon } from "obsidian";
 
 import { useCtxState, type HandnoteContext } from "./context";
 import {
-  HIGHLIGHTER_WIDTHS,
+  formatMm,
   MAX_FAVOURITES,
+  MM_PRESETS,
+  MM_RANGE,
+  mmToWidth,
   PALETTE,
-  PEN_WIDTHS,
+  sameMm,
+  widthToMm,
   useSettings,
   type CoreSettings,
   type Template,
@@ -25,6 +29,14 @@ export function glassClass(ctx: HandnoteContext) {
 }
 
 /** Stops a misbehaving feature from taking the whole page down. */
+/** Shows a visible message when a feature breaks, so problems on the iPad aren't silent. */
+export const crashLog: { feature: string; error: string; at: string }[] = [];
+export function reportCrash(feature: string, e: unknown) {
+  const error = e instanceof Error ? e.message : String(e);
+  crashLog.push({ feature, error, at: new Date().toISOString() });
+  new Notice(`Handnote: "${feature}" stopped working: ${error}`, 10000);
+}
+
 export class FeatureBoundary extends Component<{ id: string; children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -32,6 +44,7 @@ export class FeatureBoundary extends Component<{ id: string; children: ReactNode
   }
   componentDidCatch(e: unknown) {
     console.error(`Handnote: feature "${this.props.id}" crashed and was switched off for this note`, e);
+    reportCrash(this.props.id, e);
   }
   render() {
     return this.state.failed ? null : this.props.children;
@@ -41,6 +54,9 @@ export class FeatureBoundary extends Component<{ id: string; children: ReactNode
 /* ------------------------------------------------------------------ */
 /* Pen / highlighter panel                                             */
 /* ------------------------------------------------------------------ */
+
+/** Size preview: the line at its real size on the page (100% zoom). */
+const PREVIEW_PX_PER_MM = 96 / 25.4;
 
 export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
   const settings = useSettings(ctx.store);
@@ -54,7 +70,12 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
 
   const target = ctx.inkTarget();
   const cfg = settings.core[target];
-  const widths = target === "highlighter" ? HIGHLIGHTER_WIDTHS : PEN_WIDTHS;
+  const mm = widthToMm(target, cfg.width);
+  const range = MM_RANGE[target];
+  const setMm = (v: number) => {
+    const clamped = Math.min(range.max, Math.max(range.min, Math.round(v / range.step) * range.step));
+    updateInk({ width: mmToWidth(target, clamped) });
+  };
   const isCurrent = (c: string) => cfg.color.toLowerCase() === c.toLowerCase();
 
   const updateInk = (patch: Partial<CoreSettings["pen"]>) =>
@@ -79,7 +100,7 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
 
   return (
     <>
-      <div className="hn-panel-title">{target === "pen" ? "Pen" : "Highlighter"}</div>
+      <div className="hn-panel-title">{ctx.tool(target)?.label ?? "Pen"}</div>
 
       <div className="hn-row hn-hues">
         {PALETTE.map((p, i) => (
@@ -140,19 +161,42 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
 
       <div className="hn-label">Size</div>
       <div className="hn-row">
-        {widths.map((w) => {
-          const d = Math.min(26, 3 + w * (target === "highlighter" ? 2.2 : 4));
+        {MM_PRESETS[target].map((p, i, all) => {
+          const d = 4 + (i / Math.max(1, all.length - 1)) * 20;
           return (
             <button
-              key={w}
-              className={`hn-width ${cfg.width === w ? "is-active" : ""}`}
-              aria-label={`Size ${w}`}
-              onClick={() => updateInk({ width: w })}
+              key={p}
+              className={`hn-width ${sameMm(mm, p) ? "is-active" : ""}`}
+              aria-label={`Size ${formatMm(p)}`}
+              title={formatMm(p)}
+              onClick={() => setMm(p)}
             >
               <span style={{ width: d, height: d, background: cfg.color, opacity: cfg.opacity / 100 }} />
             </button>
           );
         })}
+      </div>
+      <div className="hn-mm">
+        <button className="hn-mm-step" aria-label="Thinner" onClick={() => setMm(mm - range.step)}>
+          −
+        </button>
+        <input
+          className="hn-mm-slider"
+          type="range"
+          aria-label="Size in millimetres"
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          value={Math.min(range.max, Math.max(range.min, mm))}
+          onChange={(e) => setMm(parseFloat(e.target.value))}
+        />
+        <button className="hn-mm-step" aria-label="Thicker" onClick={() => setMm(mm + range.step)}>
+          +
+        </button>
+        <span className="hn-mm-value">{formatMm(mm)}</span>
+      </div>
+      <div className="hn-mm-preview" aria-hidden>
+        <span style={{ height: Math.max(1, mm * PREVIEW_PX_PER_MM), background: cfg.color, opacity: cfg.opacity / 100 }} />
       </div>
 
       {sections}

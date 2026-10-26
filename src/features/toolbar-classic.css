@@ -117,3 +117,42 @@
 .hn-dark .hn-size-quick > span:not(.hn-eraser-dot) {
   filter: invert(93%) hue-rotate(180deg);
 }
+
+/* Second bar under the top bar: colours and sizes for the active tool */
+.hn-optionsbar {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border-radius: 20px;
+  max-width: calc(100% - 20px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hn-optionsbar::-webkit-scrollbar {
+  display: none;
+}
+.hn-optionsbar button.hn-btn {
+  width: 34px;
+  height: 34px;
+}
+.hn-panel.hn-panel-top.hn-panel-below-options {
+  top: 108px;
+}
+/* Room for both bars above Excalidraw's own top bar */
+.hn-root .excalidraw .App-menu_top {
+  margin-top: 104px;
+}
+.hn-root button.hn-btn.hn-mm-chip {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

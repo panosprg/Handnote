@@ -5,12 +5,17 @@ Handwritten notes for Obsidian, made for iPad + Apple Pencil, built on the Excal
 ## What it does
 
 - **Notebooks with pages** (A4, or the pages of an imported PDF), a library with covers and folders, export to PDF.
-- **Pens:** fountain pen (pressure), ballpoint (even line), pencil, highlighter (goes under the ink, snaps straight).
+- **Pens:** pen (even line, the default), fountain pen (pressure), pencil, highlighter (goes under the ink, snaps straight).
+  Sizes are in millimetres on the printed page: quick sizes in the second bar, an exact slider in the colour panel.
+- **Fast ink:** the line you're writing is drawn on its own layer straight from the Pencil and handed to
+  Excalidraw when you lift it, so writing doesn't lag (about 12× less work per Pencil movement than plain Excalidraw).
 - **Erasers:** precision (only what you rub) and object (whole strokes), with an un-draw animation; scribble to delete.
 - **Writing help:** shape-preserving stabilization, hold-to-snap shapes, ruler, Pencil-tip indicator.
 - **Selecting:** lasso and rectangle, one clean outline; selection bar with headings, links and Solve.
 - **Headings + outline**, **links to notes**, **maths solving** (the last two kinds of recognition need MyScript keys).
-- **Gestures:** one finger scrolls, pinch zooms, two/three-finger tap = undo/redo, finger hold or Pencil press-and-hold opens the quick dial.
+- **Gestures:** one finger scrolls, pinch zooms, two/three-finger tap = undo/redo, swipe up past the last page to add one,
+  finger hold or Pencil press-and-hold opens the quick dial.
+- If a feature breaks, a message says which one and why (instead of it silently disappearing).
 
 ### Handwriting recognition (optional)
 
@@ -32,6 +37,7 @@ Updates arrive automatically once this is set up. You only do it once.
 ```bash
 npm install          # first time only
 npm test             # browser tests with real pen/touch input
+python3 test/perf.py 4 800 bare   # writing cost vs plain Excalidraw (CPU slowed 4×, 800 strokes on the page)
 npm version minor    # 0.2.0 → 0.3.0 (use "patch" for fixes)
 git push
 ```

@@ -30,8 +30,8 @@ const ink = (id: InkToolId, label: string, icon: string, order: number): ToolDef
 
 /** Tools that are always there. Features add more (erasers, lasso…). */
 export const CORE_TOOLS: ToolDef[] = [
+  ink("ballpoint", "Pen", "pen", 9),
   ink("pen", "Fountain pen", "pen-tool", 10),
-  ink("ballpoint", "Ballpoint", "pen", 11),
   ink("pencil", "Pencil", "pencil", 12),
   ink("highlighter", "Highlighter", "highlighter", 20),
   {
