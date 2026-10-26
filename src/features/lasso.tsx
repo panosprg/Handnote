@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CaptureUpdateAction, getCommonBounds } from "@excalidraw/excalidraw";
 import type { El, HandnoteContext } from "../core/context";
+import { isInkElement } from "../core/tools";
 import { defineFeature } from "../core/types";
 import "./lasso.css";
 
@@ -22,7 +23,7 @@ function inside(p: P, poly: P[]): boolean {
 export function lassoHits(els: El[], poly: P[]): El[] {
   return els.filter((el) => {
     if (el.isDeleted || el.locked) return false;
-    if (el.type === "freedraw" && el.points?.length) {
+    if (isInkElement(el) && el.points?.length) {
       const pts = el.points.map(([x, y]) => [el.x + x, el.y + y] as P);
       return pts.filter((p) => inside(p, poly)).length / pts.length >= 0.5;
     }

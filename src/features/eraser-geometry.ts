@@ -1,5 +1,9 @@
 import { newElementWith } from "@excalidraw/excalidraw";
 import type { El } from "../core/context";
+import { isInkElement } from "../core/tools";
+
+/** How far from its centre line a stroke's ink reaches. */
+const inkReach = (el: El) => (el.type === "line" ? ((el.strokeWidth as number) + 0.5) / 2 + 1 : (el.strokeWidth as number) * 1.5);
 
 type P = { x: number; y: number };
 
@@ -27,6 +31,18 @@ const randomId = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => (b % 36).toString(36)).join("");
 const randomInt = () => Math.floor(Math.random() * 2 ** 31);
 
+/** Extra points every `step` along a polyline, so it can be cut anywhere. */
+function densify(pts: P[], step: number): P[] {
+  const out: P[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 1; k <= n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  return out;
+}
+
 function buildPiece(el: El, pts: P[], pressures: number[], keepId: boolean): El {
   const ox = pts[0].x;
   const oy = pts[0].y;
@@ -37,7 +53,7 @@ function buildPiece(el: El, pts: P[], pressures: number[], keepId: boolean): El 
     x: ox,
     y: oy,
     points: rel,
-    pressures,
+    ...(el.type === "freedraw" ? { pressures } : {}),
     width: Math.max(...xs) - Math.min(...xs),
     height: Math.max(...ys) - Math.min(...ys),
     lastCommittedPoint: rel[rel.length - 1],
@@ -59,7 +75,7 @@ export function eraseAlong(all: El[], a: P, b: P, r: number): { next: El[]; remo
   const next: El[] = [];
 
   for (const el of all) {
-    if (el.isDeleted || el.locked || el.type !== "freedraw" || !el.points || el.points.length < 2) {
+    if (el.isDeleted || el.locked || !isInkElement(el) || !el.points || el.points.length < 2) {
       next.push(el);
       continue;
     }
@@ -71,10 +87,11 @@ export function eraseAlong(all: El[], a: P, b: P, r: number): { next: El[]; remo
       continue;
     }
 
-    const pts: P[] = pxs.map((x, i) => ({ x, y: pys[i] }));
+    let pts: P[] = pxs.map((x, i) => ({ x, y: pys[i] }));
+    if (el.type === "line") pts = densify(pts, 2); // a dotted/dashed line may have only a few points
     const hasPressure = !!el.pressures && el.pressures.length === pts.length;
     // Ink has visible thickness: count it as part of the eraser radius.
-    const reach = r + el.strokeWidth * 1.5;
+    const reach = r + inkReach(el);
     const keep = pts.map((p) => distToSegment(p, a, b) > reach);
 
     const runs: number[][] = [];
@@ -129,8 +146,8 @@ export function eraseObjectsAlong(all: El[], a: P, b: P, r: number): { next: El[
   const next = all.map((el) => {
     if (el.isDeleted || el.locked) return el;
     let hit = false;
-    if (el.type === "freedraw" && el.points && el.points.length) {
-      const reach = r + el.strokeWidth * 1.5;
+    if (isInkElement(el) && el.points && el.points.length) {
+      const reach = r + inkReach(el);
       const pts = el.points.map(([x, y]) => ({ x: el.x + x, y: el.y + y }));
       if (pts.length === 1) hit = distToSegment(pts[0], a, b) <= reach;
       for (let i = 1; i < pts.length && !hit; i++) hit = segToSeg(pts[i - 1], pts[i], a, b) <= reach;

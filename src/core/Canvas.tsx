@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Excalidraw, getSceneVersion } from "@excalidraw/excalidraw";
+import { CaptureUpdateAction, Excalidraw, getSceneVersion } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import type { HandnoteFile } from "../data";
@@ -9,7 +9,7 @@ import { fitWidth, Paper, PagesUi, type PaperHandle } from "./Paper";
 import { SelectionBar } from "./SelectionBar";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
-import { BALLPOINT_FILTER } from "./tools";
+import { BALLPOINT_FILTER, DASH_FILTER, HIGHLIGHTER_FILTER } from "./tools";
 import { FeatureBoundary, reportCrash } from "./ui";
 
 export interface CanvasProps {
@@ -62,9 +62,13 @@ export default function Canvas(props: CanvasProps) {
     onReady(api, c);
     loadPageImages?.().then((imgs) => c.setState({ pageImages: imgs }));
     const offBallpoint = c.pen.addFilter(BALLPOINT_FILTER);
+    const offHighlighter = c.pen.addFilter(HIGHLIGHTER_FILTER);
+    const offDash = c.pen.addFilter(DASH_FILTER);
     c.tool("ballpoint")!.activate(c);
     return () => {
       offBallpoint();
+      offHighlighter();
+      offDash();
       c.destroy();
     };
   }, [api]);
@@ -170,7 +174,13 @@ export default function Canvas(props: CanvasProps) {
 
   return (
     <div ref={rootRef} className={cls}>
-      <Paper ref={paperRef} pages={ui?.pages ?? initial.handnote.pages} images={ui?.pageImages} />
+      <Paper
+        ref={paperRef}
+        pages={ui?.pages ?? initial.handnote.pages}
+        images={ui?.pageImages}
+        template={template}
+        dark={isDark}
+      />
       <div className="hn-excalidraw">
         <Excalidraw
           excalidrawAPI={(a) => {
@@ -222,6 +232,20 @@ export default function Canvas(props: CanvasProps) {
             }
           }}
           onScrollChange={(x, y, zoom) => {
+            // Never smaller than the page filling the screen width (also for wheel/keyboard zoom).
+            const min = ctx?.minZoom();
+            if (ctx && min && zoom.value < min - 1e-3) {
+              const cx = ctx.root.clientWidth / 2;
+              const cy = ctx.root.clientHeight / 2;
+              const sx = cx / zoom.value - x;
+              const sy = cy / zoom.value - y;
+              queueMicrotask(() =>
+                ctx.api.updateScene({
+                  appState: { zoom: { value: min as never }, scrollX: cx / min - sx, scrollY: cy / min - sy },
+                  captureUpdate: CaptureUpdateAction.NEVER,
+                }),
+              );
+            }
             updatePaper(x, y, zoom.value);
             ctx?.events.emit("scroll", x, y, zoom.value);
           }}

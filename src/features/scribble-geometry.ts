@@ -85,7 +85,7 @@ export function findScribbleTargets(scribble: InkElement, all: readonly InkEleme
 
   return all.filter((el) => {
     if (el.isDeleted || el.id === scribble.id) return false;
-    if (el.type === "freedraw" && el.points && el.points.length) {
+    if ((el.type === "freedraw" || (el.type === "line" && (el as { customData?: { hn?: string } }).customData?.hn === "dash")) && el.points && el.points.length) {
       const pts = absPoints(el);
       const inside = pts.filter(([x, y]) => inBox(x, y)).length;
       return inside / pts.length >= 0.5;

@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useCtxState, type HandnoteContext } from "./context";
 import { pageAt, pageRects, totalHeight, maxWidth, type PagesInfo } from "./pages";
+import type { Template } from "./settings";
+import { templateCss } from "./templates";
 import { Icon } from "./ui";
 
 export interface PaperHandle {
@@ -13,10 +15,10 @@ export interface PaperHandle {
  * step with Excalidraw's scroll/zoom. Templates (lines, grid, dots) are drawn
  * on each sheet in scene units, so they scale with the page.
  */
-export const Paper = forwardRef<PaperHandle, { pages: PagesInfo; images?: (string | undefined)[] }>(function Paper(
-  { pages, images },
-  ref,
-) {
+export const Paper = forwardRef<
+  PaperHandle,
+  { pages: PagesInfo; images?: (string | undefined)[]; template: Template; dark: boolean }
+>(function Paper({ pages, images, template, dark }, ref) {
   const sheets = useRef<HTMLDivElement>(null);
   useImperativeHandle(ref, () => ({
     update(x, y, z) {
@@ -30,7 +32,14 @@ export const Paper = forwardRef<PaperHandle, { pages: PagesInfo; images?: (strin
           <div
             key={r.index}
             className={`hn-sheet ${images?.[r.index] ? "hn-sheet-pdf" : ""}`}
-            style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+            data-template={pages.sizes[r.index].template ?? template}
+            style={{
+              left: r.x,
+              top: r.y,
+              width: r.w,
+              height: r.h,
+              backgroundImage: images?.[r.index] ? "none" : templateCss(pages.sizes[r.index].template ?? template, r.w, r.h, dark),
+            }}
           >
             {images?.[r.index] && <img className="hn-sheet-img" src={images[r.index]} alt="" draggable={false} />}
           </div>
@@ -85,6 +94,7 @@ export function PagesUi({ ctx }: { ctx: HandnoteContext }) {
 export function fitWidth(pages: PagesInfo, viewportWidth: number) {
   const w = maxWidth(pages);
   const vw = viewportWidth || 800;
-  const z = Math.min(1.6, Math.max(0.4, (vw - 48) / w));
+  // Same as the zoom-out limit (HandnoteContext.minZoom): the page fills the screen width.
+  const z = Math.max(0.1, (vw - 48) / w);
   return { zoom: z, scrollX: (vw / z - w) / 2, scrollY: 24 / z };
 }

@@ -1,12 +1,16 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import { Notice, setIcon } from "obsidian";
+import { templatePreviewCss } from "./templates";
 
 import { useCtxState, type HandnoteContext } from "./context";
 import {
   formatMm,
   MAX_FAVOURITES,
+  MAX_PINNED,
   MM_PRESETS,
   MM_RANGE,
+  PEN_TYPES,
+  TEMPLATES,
   mmToWidth,
   PALETTE,
   sameMm,
@@ -55,6 +59,92 @@ export class FeatureBoundary extends Component<{ id: string; children: ReactNode
 /* Pen / highlighter panel                                             */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Shared menu pieces                                                  */
+/* ------------------------------------------------------------------ */
+
+/** A small drawing of each pen type, for Line options. */
+function LineSample({ type, color }: { type: string; color: string }) {
+  const common = { fill: "none", stroke: color, strokeLinecap: "round" as const };
+  return (
+    <svg width="44" height="14" viewBox="0 0 44 14" aria-hidden>
+      {type === "pen" ? (
+        <path d="M3 10 C 12 2, 20 2, 26 7 S 38 11, 41 4" {...common} strokeWidth="1" />
+      ) : null}
+      {type === "pen" ? <path d="M10 6.5 C 16 3.5, 21 4, 26 7" {...common} strokeWidth="3" /> : null}
+      {type === "ballpoint" ? <path d="M3 10 C 12 2, 20 2, 26 7 S 38 11, 41 4" {...common} strokeWidth="2" /> : null}
+      {type === "dotted" ? <path d="M3 7 H 41" {...common} strokeWidth="2.6" strokeDasharray="0.1 5.5" /> : null}
+      {type === "dashed" ? <path d="M3 7 H 41" {...common} strokeWidth="2.2" strokeDasharray="6 5" /> : null}
+    </svg>
+  );
+}
+
+/** Pick which tool of a group (pen type, eraser type) the group's button uses. */
+export function TypePicker({ ctx, title, options }: { ctx: HandnoteContext; title: string; options: { id: string; name: string }[] }) {
+  const ui = useCtxState(ctx);
+  return (
+    <>
+      <div className="hn-label">{title}</div>
+      <div className="hn-row hn-types" role="radiogroup" aria-label={title}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            role="radio"
+            aria-checked={ui.tool === o.id}
+            className={`hn-type ${ui.tool === o.id ? "is-active" : ""}`}
+            aria-label={o.name}
+            onClick={() => ui.tool !== o.id && ctx.setTool(o.id)}
+          >
+            {PEN_TYPES.some((p) => p.id === o.id) ? <LineSample type={o.id} color="currentColor" /> : null}
+            <span>{o.name}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** The sizes pinned to the second bar for one tool (max 3), with pin / unpin. */
+export function PinnedSizes({
+  ctx,
+  tool,
+  current,
+  format,
+  same = (a, b) => Math.abs(a - b) < 0.005,
+}: {
+  ctx: HandnoteContext;
+  tool: string;
+  current: number;
+  format: (v: number) => string;
+  same?: (a: number, b: number) => boolean;
+}) {
+  const settings = useSettings(ctx.store);
+  const pins = settings.core.pinned[tool] ?? [];
+  const set = (next: number[]) =>
+    ctx.store.updateCore({ pinned: { ...settings.core.pinned, [tool]: [...next].sort((a, b) => a - b) } });
+  const pinnedNow = pins.some((p) => same(p, current));
+  return (
+    <>
+      <div className="hn-label">
+        In the bar <span className="hn-value">{pins.length} / {MAX_PINNED}</span>
+      </div>
+      <div className="hn-row hn-pins">
+        {pins.map((p) => (
+          <button key={p} className="hn-pin" aria-label={`Unpin ${format(p)}`} onClick={() => set(pins.filter((x) => x !== p))}>
+            {format(p)} <span className="hn-pin-x">×</span>
+          </button>
+        ))}
+        {!pinnedNow && pins.length < MAX_PINNED && (
+          <button className="hn-pin hn-pin-add" aria-label={`Pin ${format(current)}`} onClick={() => set([...pins, current])}>
+            + Pin {format(current)}
+          </button>
+        )}
+        {!pinnedNow && pins.length >= MAX_PINNED && <span className="hn-pin-note">Unpin one to add {format(current)}</span>}
+      </div>
+    </>
+  );
+}
+
 /** Size preview: the line at its real size on the page (100% zoom). */
 const PREVIEW_PX_PER_MM = 96 / 25.4;
 
@@ -100,7 +190,10 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
 
   return (
     <>
-      <div className="hn-panel-title">{ctx.tool(target)?.label ?? "Pen"}</div>
+      <div className="hn-panel-title">{ctx.tool(target)?.group === "pen" ? "Pen" : (ctx.tool(target)?.label ?? "Pen")}</div>
+      {ctx.tool(target)?.group === "pen" && (
+        <TypePicker ctx={ctx} title="Line options" options={PEN_TYPES.filter((p) => ctx.tool(p.id))} />
+      )}
 
       <div className="hn-row hn-hues">
         {PALETTE.map((p, i) => (
@@ -195,9 +288,18 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
         </button>
         <span className="hn-mm-value">{formatMm(mm)}</span>
       </div>
-      <div className="hn-mm-preview" aria-hidden>
-        <span style={{ height: Math.max(1, mm * PREVIEW_PX_PER_MM), background: cfg.color, opacity: cfg.opacity / 100 }} />
+      <div className={`hn-mm-preview ${target === "dotted" || target === "dashed" ? `hn-mm-preview-${target}` : ""}`} aria-hidden>
+        <span
+          style={{
+            height: Math.max(1, mm * PREVIEW_PX_PER_MM),
+            ...(target === "dotted" || target === "dashed"
+              ? { color: cfg.color, borderTopWidth: Math.max(1, mm * PREVIEW_PX_PER_MM) }
+              : { background: cfg.color }),
+            opacity: cfg.opacity / 100,
+          }}
+        />
       </div>
+      <PinnedSizes ctx={ctx} tool={target} current={Math.round(mm * 100) / 100} format={formatMm} same={sameMm} />
 
       {sections}
     </>
@@ -208,22 +310,84 @@ export function InkPanel({ ctx }: { ctx: HandnoteContext }) {
 /* Paper panel                                                         */
 /* ------------------------------------------------------------------ */
 
+/** "1-3, 5" → [0, 1, 2, 4] (0-based, within 1..count). */
+export function parsePageRange(text: string, count: number): number[] {
+  const out = new Set<number>();
+  for (const part of text.split(/[,;\s]+/).filter(Boolean)) {
+    const m = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) continue;
+    let a = Number(m[1]);
+    let b = m[2] ? Number(m[2]) : a;
+    if (a > b) [a, b] = [b, a];
+    for (let i = Math.max(1, a); i <= Math.min(count, b); i++) out.add(i - 1);
+  }
+  return [...out].sort((x, y) => x - y);
+}
+
 export function PaperPanel({ ctx }: { ctx: HandnoteContext }) {
-  const { template } = useCtxState(ctx);
+  const ui = useCtxState(ctx);
+  const pageCount = ui.pages.sizes.length;
+  const [scope, setScope] = useState<"page" | "all">(pageCount > 1 ? "page" : "all");
+  const page = ctx.currentPage();
+  const current = scope === "all" ? ui.template : ctx.pageTemplate(page);
+  const dark = ctx.root.classList.contains("hn-dark");
   return (
     <>
       <div className="hn-panel-title">Paper</div>
-      <div className="hn-row">
-        {(["blank", "lined", "grid", "dots"] as Template[]).map((t) => (
+      <div className="hn-row hn-types" role="radiogroup" aria-label="Apply paper to">
+        <button role="radio" aria-checked={scope === "page"} className={`hn-type ${scope === "page" ? "is-active" : ""}`} onClick={() => setScope("page")}>
+          <span>This page ({page + 1})</span>
+        </button>
+        <button role="radio" aria-checked={scope === "all"} className={`hn-type ${scope === "all" ? "is-active" : ""}`} onClick={() => setScope("all")}>
+          <span>All pages</span>
+        </button>
+      </div>
+      <div className="hn-paper-grid">
+        {TEMPLATES.map((t) => (
           <button
-            key={t}
-            className={`hn-paper-opt hn-tpl-${t} ${template === t ? "is-active" : ""}`}
-            onClick={() => ctx.setTemplate(t)}
+            key={t.id}
+            className={`hn-paper-opt hn-tpl-${t.id} ${current === t.id ? "is-active" : ""}`}
+            aria-label={t.name}
+            onClick={() => ctx.setPageTemplate(scope === "all" ? "all" : page, t.id)}
           >
-            <span className="hn-paper-preview" />
-            <span className="hn-paper-name">{t[0].toUpperCase() + t.slice(1)}</span>
+            <span className="hn-paper-preview" style={{ backgroundImage: templatePreviewCss(t.id, dark) }} />
+            <span className="hn-paper-name">{t.name}</span>
           </button>
         ))}
+      </div>
+    </>
+  );
+}
+
+function PrintRow({ ctx }: { ctx: HandnoteContext }) {
+  const ui = useCtxState(ctx);
+  const [range, setRange] = useState("");
+  const count = ui.pages.sizes.length;
+  const go = (pages?: number[]) => {
+    ctx.setState({ panel: null });
+    void ctx.host.print?.(pages);
+  };
+  const picked = parsePageRange(range, count);
+  return (
+    <>
+      <div className="hn-label">Print</div>
+      <div className="hn-row hn-print">
+        <button className="hn-chip" aria-label="Print all pages" onClick={() => go()}>
+          <Icon name="printer" /> All pages
+        </button>
+        <button className="hn-chip" aria-label="Print this page" onClick={() => go([ctx.currentPage()])}>
+          This page
+        </button>
+        <input
+          className="hn-range"
+          aria-label="Pages to print"
+          placeholder={count > 1 ? `e.g. 1-${Math.min(3, count)}` : "1"}
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+        />
+        <button className="hn-chip" disabled={!picked.length} aria-label="Print these pages" onClick={() => go(picked)}>
+          Print {picked.length ? `${picked.length} page${picked.length > 1 ? "s" : ""}` : "pages"}
+        </button>
       </div>
     </>
   );
@@ -267,7 +431,17 @@ export function PanelHost({
           >
             <Icon name="file-down" /> Export PDF
           </button>
+          <button
+            className="hn-chip"
+            onClick={() => {
+              ctx.setState({ panel: null });
+              ctx.events.emit("editToolbar" as never);
+            }}
+          >
+            <Icon name="layout-grid" /> Edit toolbar
+          </button>
         </div>
+        {ctx.host.print && <PrintRow ctx={ctx} />}
       </>
     );
   }

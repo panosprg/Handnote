@@ -156,3 +156,107 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Toolbar items and editing */
+.hn-tb-item {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+/* The buttons wiggle; their − badges stay still so they're easy to hit. */
+.hn-toolbar-editing .hn-tb-item {
+  touch-action: none;
+}
+.hn-toolbar-editing .hn-tb-item > .hn-btn {
+  animation: hn-wiggle 0.32s ease-in-out infinite alternate;
+}
+.hn-toolbar-editing .hn-tb-item:nth-child(2n) > .hn-btn {
+  animation-delay: -0.16s;
+}
+.hn-toolbar-editing .hn-tb-item.is-dragging {
+  animation: none;
+  transform: scale(1.15);
+  z-index: 2;
+}
+.hn-toolbar-editing {
+  overflow: visible;
+}
+@keyframes hn-wiggle {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-toolbar-editing .hn-tb-item > .hn-btn {
+    animation: none;
+  }
+}
+.hn-root button.hn-tb-remove {
+  all: unset;
+  position: absolute;
+  top: -4px;
+  left: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(60, 60, 67, 0.75);
+  cursor: pointer;
+}
+.hn-tb-tray {
+  gap: 4px;
+}
+.hn-tb-hint {
+  font-size: 12px;
+  color: var(--hn-muted);
+  padding: 0 8px;
+}
+.hn-root button.hn-btn.hn-tb-add {
+  position: relative;
+}
+.hn-tb-plus {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hn-active-fg);
+}
+
+/* Saved dot: green = saved, red = not yet saved, amber = saving */
+.hn-root button.hn-btn.hn-save {
+  width: 30px;
+}
+.hn-save-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #34c759;
+  box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.18);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.hn-save.is-unsaved .hn-save-dot,
+.hn-save.is-error .hn-save-dot {
+  background: #ff3b30;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.18);
+}
+.hn-save.is-saving .hn-save-dot {
+  background: #ff9f0a;
+  box-shadow: 0 0 0 3px rgba(255, 159, 10, 0.2);
+}
+.hn-save.is-error .hn-save-dot {
+  animation: hn-blink 1s ease-in-out infinite alternate;
+}
+@keyframes hn-blink {
+  to {
+    opacity: 0.35;
+  }
+}

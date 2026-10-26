@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { HandnoteContext } from "../core/context";
-import { INK_TOOLS, type InkToolId } from "../core/settings";
+import { inkPx, INK_TOOLS, type InkToolId } from "../core/settings";
 import { defineFeature } from "../core/types";
 import "./cursor.css";
 
@@ -38,13 +38,14 @@ function Cursor({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
         if (e.buttons !== 0) return hide();
         const cfg = ctx.core[tool as InkToolId];
         const zoom = ctx.api.getAppState().zoom.value;
-        d = Math.max(4, Math.min(30, cfg.width * 3.4 * zoom));
+        // Exactly as wide as the line this pen will draw, at this zoom.
+        d = Math.max(2, inkPx(tool as InkToolId, cfg.width, zoom));
         ring = false;
         el.style.background = cfg.color;
-        el.style.opacity = String(Math.max(0.35, cfg.opacity / 100));
+        el.style.opacity = String(tool === "highlighter" ? Math.max(0.3, cfg.opacity / 100) : Math.max(0.6, cfg.opacity / 100));
       } else return hide();
 
-      el.className = `hn-cursor ${ring ? "hn-cursor-ring" : "hn-cursor-dot"}`;
+      el.className = `hn-cursor ${ring ? "hn-cursor-ring" : tool === "highlighter" ? "hn-cursor-dot hn-cursor-hl" : "hn-cursor-dot"}`;
       if (ring) {
         el.style.background = "";
         el.style.opacity = "";

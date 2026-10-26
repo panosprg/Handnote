@@ -155,7 +155,8 @@ export class PenPipeline {
     if (fast) {
       e.preventDefault();
       const sp = this.ctx.toScene(p.x, p.y);
-      this.active.wet = newStroke(this.ctx, sp.x, sp.y, p.pressure);
+      // Excalidraw guesses pressure from speed for a mouse; the Pencil reports it.
+      this.active.wet = newStroke(this.ctx, sp.x, sp.y, p.pressure, e.pointerType === "mouse");
       this.wetInk.begin(this.active.wet);
       return;
     }

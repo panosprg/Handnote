@@ -58,8 +58,15 @@ def wobbly(x0, x1, y, n=70, amp=3.0, seed=1):
 def tool(page):
     return page.evaluate("document.querySelector('.hn-toolbar .hn-btn.is-active')?.getAttribute('aria-label')")
 
+# Pen types and erasers share one toolbar button each; tests pick the exact one directly.
+TOOL_IDS = {"Fountain pen": "pen", "Ballpoint": "ballpoint", "Precision eraser": "precision-eraser",
+            "Object eraser": "object-eraser", "Dotted pen": "dotted", "Dashed pen": "dashed"}
+
 def tap(page, label):
-    page.click(f".hn-toolbar button[aria-label='{label}']")
+    if label in TOOL_IDS:
+        page.evaluate(f"(id => {{ if (ctx.state.tool !== id) ctx.setTool(id); }})('{TOOL_IDS[label]}')")
+    else:
+        page.click(f".hn-toolbar button[aria-label='{label}']")
     page.wait_for_timeout(120)
 
 def undo(page):
@@ -68,7 +75,7 @@ def undo(page):
 with sync_playwright() as p:
     browser = p.chromium.launch()
 
-    def open_page(query=""):
+    def open_page(query="", free_zoom=True):
         ctx = browser.new_context(viewport={"width": 1180, "height": 820}, has_touch=True, device_scale_factor=2)
         page = ctx.new_page()
         errors = []
@@ -77,6 +84,9 @@ with sync_playwright() as p:
         page.goto(URL + query)
         page.wait_for_function("window.api !== undefined")
         page.wait_for_timeout(700)
+        # Most checks draw at 100% zoom; the zoom-out limit (page fills the width) has its own test.
+        if free_zoom:
+            page.evaluate("window.ctx && (ctx.minZoom = () => 0.25)")
         return ctx, page, ctx.new_cdp_session(page), errors
 
     # ---------- pages: new notebook opens fitted to the screen ----------
@@ -149,11 +159,15 @@ with sync_playwright() as p:
 
     # ---------- toolbar ----------
     labels = page.evaluate("[...document.querySelectorAll('.hn-toolbar .hn-btn')].map(b => b.getAttribute('aria-label'))")
-    want = ["Pen", "Fountain pen", "Pencil", "Highlighter", "Precision eraser", "Object eraser", "Lasso", "Rectangle select", "Text"]
+    want = ["Pen", "Pencil", "Highlighter", "Eraser", "Lasso", "Rectangle select", "Text"]
     check("top bar has every tool", all(t in labels for t in want), ", ".join(l for l in labels if l))
     check("curved palette is gone", page.locator(".hn-arc").count() == 0)
-    check("normal pen is first and active on open", tool(page) == "Pen" and labels.index("Pen") < labels.index("Fountain pen"), str(tool(page)))
-    check("colours and sizes have their own bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 6 and page.locator(".hn-optionsbar .hn-fav-quick").count() >= 4)
+    check("one Pen and one Eraser button (pen types / eraser types are in their menus)",
+          labels.count("Pen") == 1 and "Fountain pen" not in labels and labels.count("Eraser") == 1 and "Object eraser" not in labels, ", ".join(l for l in labels if l))
+    check("Pen is active on open", tool(page) == "Pen", str(tool(page)))
+    check("second bar: colours and only the 3 pinned sizes", page.locator(".hn-optionsbar .hn-size-quick").count() == 3 and page.locator(".hn-optionsbar .hn-fav-quick").count() >= 4)
+    check("Excalidraw's ☰ menu button is hidden", page.evaluate("(() => { const b = document.querySelector('.main-menu-trigger'); return !b || b.getBoundingClientRect().width === 0 })()"))
+    check("saved dot shows green on open", page.locator(".hn-toolbar .hn-save.is-saved").count() == 1)
     check("no panel open on load", page.locator(".hn-panel").count() == 0)
 
     # ---------- pen hover dot ----------
@@ -162,7 +176,7 @@ with sync_playwright() as p:
     check("pen hover shows a dot under the tip", dot["d"] == "block" and "dot" in dot["cls"] and abs(dot["cx"] - 600) < 1.5 and abs(dot["cy"] - 400) < 1.5, str(dot))
 
     # ---------- ballpoint ----------
-    tap(page, "Pen")
+    tap(page, "Ballpoint")
     pen_stroke(cdp, line(250, 180, 700, 180, 40), page, forces=[0.2 + 0.7 * (i % 7) / 6 for i in range(40)])
     bp = last_freedraw(page)
     check("ballpoint ignores pressure (even line)", max(bp["pr"]) - min(bp["pr"]) < 1e-3 and not bp["sim"], f"{min(bp['pr'])}..{max(bp['pr'])}")
@@ -336,7 +350,7 @@ with sync_playwright() as p:
     check("two-finger tap undoes", len(els(page)) == n1 - 1)
 
     # ---------- iPad: touches on the page are cancelled (stops Scribble delaying the Pencil) ----------
-    tap(page, "Pen")
+    tap(page, "Ballpoint")
     prevented = page.evaluate("""(() => { const c = document.querySelector('canvas.excalidraw__canvas.interactive');
         const t = new Touch({ identifier: 9, target: c, clientX: 500, clientY: 500 });
         const ev = new TouchEvent('touchstart', { touches: [t], changedTouches: [t], targetTouches: [t], bubbles: true, cancelable: true });
@@ -361,12 +375,12 @@ with sync_playwright() as p:
     tap(page, "Highlighter")
     check("highlighter sizes in the top bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 3)
     tap(page, "Precision eraser")
-    check("eraser sizes in the top bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 4)
+    check("eraser sizes in the top bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 3)
     tap(page, "Fountain pen")
     page.screenshot(path=str(OUT / "toolbar.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 120})
 
     # ---------- sizes in millimetres ----------
-    tap(page, "Pen")
+    tap(page, "Ballpoint")
     page.click(".hn-optionsbar button[aria-label='Size 0.5 mm']"); page.wait_for_timeout(120)
     sw = page.evaluate("api.getAppState().currentItemStrokeWidth")
     check("0.5 mm preset sets the matching line width", abs(sw * 6.5494 / (96 / 25.4) - 0.5) < 0.01, f"strokeWidth {sw:.3f}")
@@ -466,6 +480,209 @@ with sync_playwright() as p:
     page.screenshot(path=str(OUT / "ruler.png"))
 
     check("no JavaScript errors", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # ================= fix list (0.8) =================
+    ctx, page, cdp, errors = open_page()
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})"); page.wait_for_timeout(150)
+    def panel_open(): return page.locator(".hn-panel").count() > 0
+    def last_el(): return page.evaluate("(() => { const e = api.getSceneElements().filter(e => !e.isDeleted).slice(-1)[0]; return e && {type: e.type, style: e.strokeStyle, hn: e.customData?.hn, sw: e.strokeWidth, n: e.points?.length, pr: e.pressures, sim: e.simulatePressure} })()")
+    def count(kind): return page.evaluate(f"api.getSceneElements().filter(e => !e.isDeleted && e.type === '{kind}').length")
+
+    # #4 one Pen button + Line options
+    page.click(".hn-toolbar button[aria-label='Pen']"); page.wait_for_timeout(150)  # tap again → menu
+    opts = page.evaluate("[...document.querySelectorAll('.hn-panel [role=radiogroup][aria-label=\"Line options\"] button')].map(b => b.getAttribute('aria-label'))")
+    check("#4 Pen menu has Line options: Ballpoint, Fountain, Dotted, Dashed", opts == ["Ballpoint", "Fountain", "Dotted", "Dashed"], str(opts))
+    page.click(".hn-panel button[aria-label='Dotted']"); page.wait_for_timeout(150)
+    check("#4 picking Dotted keeps the one Pen button active", page.evaluate("ctx.state.tool") == "dotted" and tool(page) == "Pen", str(tool(page)))
+    page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(100)
+    if panel_open(): page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(100)
+    n_lines = count("line")
+    pen_down(cdp, 300, 520)
+    for x, y in line(300, 520, 600, 540, 40)[1:]:
+        pen_move(cdp, x, y); page.wait_for_timeout(8)
+    wet = page.evaluate("(() => { const c = document.querySelector('canvas.hn-wet'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n })()")
+    pen_up(cdp, 600, 540); page.wait_for_timeout(250)
+    el = last_el()
+    check("#4 dotted pen draws a dotted line (one element)", el["type"] == "line" and el["style"] == "dotted" and el["hn"] == "dash" and count("line") == n_lines + 1, str(el))
+    check("#4 the dotted line shows while writing", wet > 50, f"{wet} px")
+    page.screenshot(path=str(OUT / "dotted.png"), clip={"x": 250, "y": 480, "width": 420, "height": 100})
+    tap(page, "Dashed pen")
+    pen_stroke(cdp, [(300 + i * 8, 580 + 12 * math.sin(i / 6)) for i in range(45)], page)
+    el = last_el()
+    check("#4 dashed pen draws a dashed line", el["type"] == "line" and el["style"] == "dashed", str(el))
+    undo(page)
+    check("#4 one undo removes the dashed line", count("line") == n_lines + 1)
+    # precision eraser cuts the dotted line like ink
+    tap(page, "Precision eraser")
+    pen_stroke(cdp, line(450, 500, 452, 560, 12), page)
+    check("#6 precision eraser cuts a dotted line in two", count("line") == n_lines + 2, str(count("line")))
+
+    # #5 pinned sizes (max 3)
+    tap(page, "Ballpoint"); page.click(".hn-optionsbar button[aria-label='Exact size']"); page.wait_for_timeout(150)
+    page.click(".hn-panel button[aria-label='Unpin 1 mm']"); page.wait_for_timeout(100)
+    check("#5 unpinning removes the size from the bar", page.locator(".hn-optionsbar .hn-size-quick").count() == 2)
+    page.evaluate("""() => { const i = document.querySelector('.hn-mm-slider');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '0.85');
+        i.dispatchEvent(new Event('input', { bubbles: true })); }"""); page.wait_for_timeout(100)
+    page.click(".hn-panel button[aria-label='Pin 0.85 mm']"); page.wait_for_timeout(100)
+    sizes = page.evaluate("[...document.querySelectorAll('.hn-optionsbar .hn-size-quick')].map(b => b.getAttribute('aria-label'))")
+    check("#5 pinning the current size adds it (sorted)", sizes == ["Size 0.5 mm", "Size 0.7 mm", "Size 0.85 mm"], str(sizes))
+    page.evaluate("""() => { const i = document.querySelector('.hn-mm-slider');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '2');
+        i.dispatchEvent(new Event('input', { bubbles: true })); }"""); page.wait_for_timeout(100)
+    check("#5 at most 3: a 4th can't be pinned", page.locator(".hn-panel button[aria-label='Pin 2 mm']").count() == 0 and page.locator(".hn-pin-note").count() == 1)
+    page.screenshot(path=str(OUT / "pen-menu.png"))
+    page.click(".hn-optionsbar button[aria-label='Exact size']"); page.wait_for_timeout(100)
+
+    # #6 one Eraser button, type in its menu
+    tap(page, "Precision eraser")
+    page.click(".hn-toolbar button[aria-label='Eraser']"); page.wait_for_timeout(150)
+    page.click(".hn-panel button[aria-label='Whole strokes']"); page.wait_for_timeout(150)
+    check("#6 eraser type is picked in the eraser's menu", page.evaluate("ctx.state.tool") == "object-eraser" and tool(page) == "Eraser")
+    check("#6 eraser bar shows its 3 pinned sizes", page.locator(".hn-optionsbar .hn-size-quick").count() == 3)
+    page.screenshot(path=str(OUT / "eraser-menu.png"))
+    page.keyboard.press("Escape")
+    if panel_open(): page.click(".hn-optionsbar button[aria-label='Eraser options']"); page.wait_for_timeout(100)
+
+    # #1 highlighter keeps its size when it straightens
+    tap(page, "Highlighter")
+    sw = page.evaluate("api.getAppState().currentItemStrokeWidth")
+    pen_stroke(cdp, [(300 + i * 7, 640 + random.Random(i).uniform(-2.5, 2.5)) for i in range(50)], page,
+               forces=[0.15 + 0.8 * (i % 5) / 4 for i in range(50)])
+    # highlights are moved behind the ink, so look for the newest highlight, not the last element
+    hl = page.evaluate("(() => { const e = api.getSceneElements().filter(e => !e.isDeleted && e.customData?.hn === 'hl').sort((a, b) => b.updated - a.updated)[0]; return e && {type: e.type, sw: e.strokeWidth, pr: e.pressures, sim: e.simulatePressure} })()")
+    check("#1 straightened highlight keeps the chosen size (even width, not pressure)",
+          hl["type"] == "freedraw" and hl["sw"] == sw and not hl["sim"] and hl["pr"] and max(hl["pr"]) - min(hl["pr"]) < 1e-6 and abs(hl["pr"][0] - 0.5) < 1e-6,
+          f"sw {hl['sw']} vs {sw}, pressures {hl['pr'][:3] if hl['pr'] else None}")
+
+    # #7 the tip dot is the line's real width
+    tap(page, "Ballpoint")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}}})"); page.wait_for_timeout(80)
+    hover(cdp, 700, 700); page.wait_for_timeout(60)
+    d1 = page.evaluate("document.querySelector('.hn-cursor').getBoundingClientRect().width")
+    want1 = page.evaluate("(() => { const w = store.get().core.ballpoint.width; return w * 8.5 * Math.sin((0.5 - 0.6 * (0.5 - 0.6)) * Math.PI / 2) })()")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 2}}})"); page.wait_for_timeout(80)
+    hover(cdp, 702, 700); page.wait_for_timeout(60)
+    d2 = page.evaluate("document.querySelector('.hn-cursor').getBoundingClientRect().width")
+    check("#7 tip dot = line width × zoom", abs(d1 - want1) < 0.6 and abs(d2 - 2 * want1) < 1, f"{d1:.2f}/{d2:.2f} want {want1:.2f}/{2*want1:.2f}")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}}})"); page.wait_for_timeout(80)
+
+    # #3 rearrange the bar
+    btn = page.locator(".hn-toolbar button[aria-label='Text']").bounding_box()
+    page.mouse.move(btn["x"] + 10, btn["y"] + 10); page.mouse.down(); page.wait_for_timeout(750); page.mouse.up()
+    page.wait_for_timeout(150)
+    check("#3 holding a toolbar button starts editing", page.locator(".hn-toolbar.hn-toolbar-editing").count() == 1)
+    page.click(".hn-toolbar button[aria-label='Hide Text']"); page.wait_for_timeout(120)
+    check("#3 − hides a button (it goes to the tray)", page.locator(".hn-toolbar button[aria-label='Text']").count() == 0 and page.locator(".hn-tb-tray button[aria-label='Show Text']").count() == 1)
+    a = page.locator(".hn-toolbar button[aria-label='Highlighter']").bounding_box()
+    b = page.locator(".hn-toolbar button[aria-label='Pen']").bounding_box()
+    page.mouse.move(a["x"] + 20, a["y"] + 20); page.mouse.down()
+    for k in range(1, 11):
+        page.mouse.move(a["x"] + 20 + (b["x"] - a["x"] - 10) * k / 10, a["y"] + 20); page.wait_for_timeout(16)
+    page.mouse.up(); page.wait_for_timeout(150)
+    order = page.evaluate("[...document.querySelectorAll('.hn-toolbar [data-key]')].map(e => e.dataset.key)")
+    check("#3 dragging moves a button (Highlighter before Pen)", order.index("highlighter") < order.index("group:pen"), ", ".join(order))
+    page.screenshot(path=str(OUT / "toolbar-edit.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 130})
+    page.click(".hn-tb-tray button:has-text('Done')"); page.wait_for_timeout(150)
+    saved = page.evaluate("store.get().core.toolbar")
+    check("#3 layout is saved", saved["hidden"] == ["text"] and saved["order"].index("highlighter") < saved["order"].index("group:pen"), json.dumps(saved))
+    page.click(".hn-toolbar [aria-label='Notebook']"); page.wait_for_timeout(150)
+    page.click(".hn-panel button:has-text('Edit toolbar')"); page.wait_for_timeout(150)
+    page.click(".hn-tb-tray button:has-text('Reset')"); page.wait_for_timeout(100)
+    page.click(".hn-tb-tray button:has-text('Done')"); page.wait_for_timeout(150)
+    check("#3 Reset brings the default bar back (Edit toolbar in the Notebook menu)",
+          page.locator(".hn-toolbar button[aria-label='Text']").count() == 1 and page.evaluate("store.get().core.toolbar.hidden.length") == 0)
+
+    # #9 templates, per page
+    page.click(".hn-toolbar [aria-label='Notebook']"); page.wait_for_timeout(150)
+    page.click(".hn-panel button:has-text('All pages')"); page.wait_for_timeout(80)
+    names = page.evaluate("[...document.querySelectorAll('.hn-paper-grid .hn-paper-opt')].map(b => b.getAttribute('aria-label'))")
+    check("#9 paper picker offers the study templates", all(n in names for n in ["Cornell", "Lecture", "Lines + grid", "Revision", "Mind map", "Isometric"]) and len(names) == 10, str(names))
+    page.screenshot(path=str(OUT / "paper-picker.png"))
+    page.click(".hn-paper-opt[aria-label='Lined']"); page.wait_for_timeout(80)
+    page.click(".hn-panel button:has-text('Add page')"); page.wait_for_timeout(150)
+    page.click(".hn-panel button:has-text('This page')"); page.wait_for_timeout(80)
+    page.click(".hn-paper-opt[aria-label='Cornell']"); page.wait_for_timeout(200)
+    tpl = page.evaluate("[...document.querySelectorAll('.hn-sheet')].map(s => s.dataset.template)")
+    check("#9 a template can be set for just one page", tpl[0] == "cornell" and all(t == "lined" for t in tpl[1:]), str(tpl))
+    page.evaluate("ctx.addPage(0)"); page.wait_for_timeout(150)
+    tpl = page.evaluate("[...document.querySelectorAll('.hn-sheet')].map(s => s.dataset.template)")
+    check("#9 a new page takes the paper of the page before it", tpl[1] == "cornell", str(tpl))
+    bg = page.evaluate("getComputedStyle(document.querySelector('.hn-sheet')).backgroundImage.slice(0, 40)")
+    check("#9 the page shows the template (SVG background)", bg.startswith('url("data:image/svg+xml'), bg)
+    page.evaluate("ctx.setState({panel: null})")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 0.62}, scrollX: 20, scrollY: 10}})"); page.wait_for_timeout(200)
+    page.screenshot(path=str(OUT / "cornell.png"))
+    for t in ["lecture", "twocol", "revision", "mindmap", "isometric"]:
+        page.evaluate(f"ctx.setPageTemplate(0, '{t}')"); page.wait_for_timeout(150)
+        page.screenshot(path=str(OUT / f"tpl-{t}.png"), clip={"x": 0, "y": 0, "width": 640, "height": 820})
+    page.evaluate("ctx.setPageTemplate(0, 'cornell')")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})"); page.wait_for_timeout(100)
+    # #11 print: all pages, this page, or a range
+    page.click(".hn-toolbar [aria-label='Notebook']"); page.wait_for_timeout(150)
+    page.fill(".hn-range", "2-3")
+    page.click(".hn-panel button[aria-label='Print these pages']")
+    page.wait_for_function("window.printed !== undefined", timeout=20000)
+    pr = page.evaluate("window.printed")
+    check("#11 Print in the Notebook menu prints a page range", pr["pages"] == [1, 2] and pr["count"] == 2, str(pr))
+    page.evaluate("window.printed = undefined")
+    page.click(".hn-toolbar [aria-label='Notebook']"); page.wait_for_timeout(150)
+    page.screenshot(path=str(OUT / "notebook-menu.png"))
+    page.click(".hn-panel button[aria-label='Print all pages']")
+    page.wait_for_function("window.printed !== undefined", timeout=20000)
+    check("#11 …or all pages", page.evaluate("window.printed.count") == 3, str(page.evaluate("window.printed")))
+    check("no JavaScript errors (fix list)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # #2 zoom-out stops when the page fills the width
+    ctx, page, cdp, errors = open_page(free_zoom=False)
+    mz = page.evaluate("ctx.minZoom()")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 0.3}}})"); page.wait_for_timeout(150)
+    z = page.evaluate("api.getAppState().zoom.value")
+    check("#2 zooming out below full width snaps back to full width", abs(z - mz) < 1e-3, f"{z:.3f} vs {mz:.3f}")
+    page.evaluate(f"api.updateScene({{appState: {{zoom: {{value: {mz * 2}}}}}}})"); page.wait_for_timeout(100)
+    touch(cdp, "touchStart", [(0, (500, 500))]); touch(cdp, "touchStart", [(0, (500, 500)), (1, (800, 500))])
+    for k in range(1, 16):
+        touch(cdp, "touchMove", [(0, (500 + k * 9, 500)), (1, (800 - k * 9, 500))]); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", [(1, (665, 500))]); touch(cdp, "touchEnd", []); page.wait_for_timeout(150)
+    z = page.evaluate("api.getAppState().zoom.value")
+    check("#2 pinching out stops at full width", z >= mz - 1e-3 and z < mz * 1.2, f"{z:.3f} vs {mz:.3f}")
+    ctx.close()
+
+    # #10 #12 the real view: template remembered, saved dot, echoes
+    ctx, page, cdp, errors = open_page("?view")
+    page.wait_for_function("window.ctx !== undefined"); page.wait_for_timeout(500)
+    page.evaluate("ctx.minZoom = () => 0.25")
+    check("#12 saved dot is green after opening", page.locator(".hn-save.is-saved").count() == 1)
+    page.evaluate("ctx.setPageTemplate('all', 'grid')"); page.wait_for_timeout(300)
+    saved = json.loads(page.evaluate("fileText()"))
+    check("#10 the notebook's paper is saved to the file at once", saved["handnote"]["template"] == "grid", saved["handnote"]["template"])
+    page.evaluate("ctx.addPage()"); page.wait_for_timeout(100)
+    page.evaluate("ctx.setPageTemplate(1, 'revision')"); page.wait_for_timeout(300)
+    saved = json.loads(page.evaluate("fileText()"))
+    check("#10 a page's own paper is saved too", saved["handnote"]["pages"]["sizes"][1].get("template") == "revision", json.dumps(saved["handnote"]["pages"]))
+    parsed = page.evaluate("(t => parseNote(t, 'lined').handnote)(fileText())")
+    check("#10 reopening reads the same papers back", parsed["template"] == "grid" and parsed["pages"]["sizes"][1]["template"] == "revision")
+    # write something: red until saved, then green
+    pen_stroke(cdp, line(300, 400, 600, 420, 30), page, settle=60)
+    red = page.locator(".hn-save.is-unsaved, .hn-save.is-saving").count() == 1
+    page.wait_for_timeout(1400)
+    check("#12 dot goes red after writing, then green once saved", red and page.locator(".hn-save.is-saved").count() == 1)
+    # an old copy of the file arriving late (sync echo) must not undo anything
+    before = page.evaluate("api.getSceneElements().length")
+    page.evaluate("view.setViewData(view.recentWrites[view.recentWrites.length - 1], false)"); page.wait_for_timeout(300)
+    check("#10 a late echo of an older save doesn't reload the notebook", page.evaluate("api.getSceneElements().length") == before and page.evaluate("ctx.state.template") == "grid")
+    # a failed save stays red and says why; tapping retries
+    page.evaluate("window.failSave = 'disk full'")
+    pen_stroke(cdp, line(300, 450, 600, 470, 30), page, settle=60)
+    page.wait_for_timeout(1400)
+    check("#12 a failed save shows the error dot", page.locator(".hn-save.is-error").count() == 1 and "disk full" in (page.locator(".hn-save").get_attribute("title") or ""))
+    page.evaluate("window.failSave = undefined")
+    page.click(".hn-save"); page.wait_for_timeout(300)
+    check("#12 tapping the dot saves now", page.locator(".hn-save.is-saved").count() == 1)
+    page.screenshot(path=str(OUT / "saved-dot.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 80})
+    check("no JavaScript errors (view)", not [e for e in errors if "disk full" not in e], "; ".join(errors[:3]))
     ctx.close()
 
     # ---------- old settings migrate ----------

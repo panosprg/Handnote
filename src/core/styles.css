@@ -77,23 +77,10 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 18px rgba(0, 0, 0, 0.08);
 }
 
-/* Templates, in page units (they scale with the page). */
-.hn-tpl-lined .hn-sheet,
-.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
-  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
-  background-size: 100% 32px;
-}
-.hn-tpl-grid .hn-sheet,
-.hn-paper-opt.hn-tpl-grid .hn-paper-preview {
-  background-image:
-    linear-gradient(to bottom, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px)),
-    linear-gradient(to right, transparent calc(100% - 1px), var(--hn-line) calc(100% - 1px));
-  background-size: 24px 24px;
-}
-.hn-tpl-dots .hn-sheet,
-.hn-paper-opt.hn-tpl-dots .hn-paper-preview {
-  background-image: radial-gradient(circle at 1px 1px, var(--hn-dot) 1.3px, transparent 1.8px);
-  background-size: 24px 24px;
+/* Templates are SVG backgrounds set per page (core/templates.ts), in page units. */
+.hn-sheet {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 /* Layer above the ink that moves with the pages (add-page button). */
@@ -164,11 +151,7 @@
   -webkit-user-select: none;
   user-select: none;
 }
-.hn-tpl-lined .hn-sheet.hn-sheet-pdf,
-.hn-tpl-grid .hn-sheet.hn-sheet-pdf,
-.hn-tpl-dots .hn-sheet.hn-sheet-pdf {
-  background-image: none;
-}
+
 
 .hn-root .excalidraw,
 .hn-root .excalidraw .excalidraw__canvas {
@@ -392,11 +375,9 @@
   height: 78px;
   border-radius: 10px;
   background-color: var(--hn-paper);
-  background-size: 10px 10px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-}
-.hn-paper-opt.hn-tpl-lined .hn-paper-preview {
-  background-size: 100% 10px;
 }
 .hn-paper-opt.is-active .hn-paper-preview {
   box-shadow: 0 0 0 2px var(--hn-paper), 0 0 0 4px var(--hn-active-fg);
@@ -455,13 +436,6 @@
   display: none !important;
 }
 
-.hn-root .hn-paper-opt.hn-tpl-lined .hn-paper-preview {
-  background-size: 100% 10px;
-}
-.hn-root .hn-paper-opt.hn-tpl-grid .hn-paper-preview,
-.hn-root .hn-paper-opt.hn-tpl-dots .hn-paper-preview {
-  background-size: 10px 10px;
-}
 
 .hn-root button.hn-chip {
   all: unset;
@@ -575,4 +549,121 @@
 .hn-mm-preview span {
   flex: 1;
   border-radius: 999px;
+}
+
+/* Excalidraw's own ☰ main menu: everything useful in it is in Handnote's menus. */
+.hn-root:not(.hn-native) .excalidraw .main-menu-trigger {
+  display: none !important;
+}
+
+/* Paper picker: all templates in a grid */
+.hn-paper-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px 6px;
+  margin: 6px 0 4px;
+}
+.hn-paper-grid .hn-paper-name {
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Segmented choice (Line options, eraser type, this page / all pages) */
+.hn-types {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.hn-root button.hn-type {
+  all: unset;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-width: 64px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--hn-text);
+  background: rgba(127, 127, 127, 0.1);
+  transition: background 0.15s ease;
+}
+.hn-root button.hn-type.is-active {
+  background: var(--hn-active);
+  color: var(--hn-active-fg);
+  font-weight: 600;
+}
+.hn-hint {
+  font-size: 12px;
+  color: var(--hn-muted);
+  margin: 4px 2px 0;
+}
+
+/* Sizes pinned to the bar */
+.hn-pins {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hn-root button.hn-pin {
+  all: unset;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  color: var(--hn-text);
+  background: rgba(127, 127, 127, 0.14);
+}
+.hn-root button.hn-pin-add {
+  color: var(--hn-active-fg);
+  background: var(--hn-active);
+}
+.hn-pin-x {
+  opacity: 0.55;
+  margin-left: 3px;
+}
+.hn-pin-note {
+  font-size: 12px;
+  color: var(--hn-muted);
+}
+.hn-mm-preview-dotted span,
+.hn-mm-preview-dashed span {
+  height: 0 !important;
+  background: none !important;
+  border-top-style: dotted;
+  border-top-color: currentColor;
+  border-radius: 0;
+}
+.hn-mm-preview-dashed span {
+  border-top-style: dashed;
+}
+
+/* Print */
+.hn-print {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.hn-range {
+  width: 90px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  background: transparent;
+  color: var(--hn-text);
+  font-size: 13px;
+}
+.hn-root button.hn-chip[disabled] {
+  opacity: 0.45;
+  pointer-events: none;
 }

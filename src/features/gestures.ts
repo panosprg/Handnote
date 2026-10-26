@@ -10,7 +10,6 @@ const PULL_START = 90;
 const PULL_LENGTH = 150;
 
 const MOVE_TOLERANCE = 10;
-const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 5;
 
 /**
@@ -124,7 +123,8 @@ export default defineFeature<S>({
       const st = ctx.api.getAppState();
       if (touches.size >= 2 && pinch) {
         const c = centre();
-        const z1 = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.zoom * (c.d / pinch.dist)));
+        // Zoom out only until the page fills the screen width (like Goodnotes).
+        const z1 = Math.min(MAX_ZOOM, Math.max(ctx.minZoom(), pinch.zoom * (c.d / pinch.dist)));
         // The scene point that was under the fingers stays under the fingers (zoom + move together).
         const anchorX = pinch.cx / st.zoom.value - st.scrollX;
         const anchorY = pinch.cy / st.zoom.value - st.scrollY;

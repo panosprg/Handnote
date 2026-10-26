@@ -101,6 +101,22 @@ export class WetInk {
     const st = this.ctx.api.getAppState();
     const s = (window.devicePixelRatio || 1) * st.zoom.value;
     g.setTransform(s, 0, 0, s, (el.x + st.scrollX) * s, (el.y + st.scrollY) * s);
+    const tool = this.ctx.state.tool;
+    if (tool === "dotted" || tool === "dashed") {
+      // Same look as the Excalidraw line it becomes: width + 0.5, Excalidraw's dash pattern.
+      const sw = el.strokeWidth as number;
+      g.globalAlpha = ((el.opacity as number) ?? 100) / 100;
+      g.strokeStyle = el.strokeColor as string;
+      g.lineWidth = sw + 0.5;
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      g.setLineDash(tool === "dashed" ? [8, 8 + sw] : [1.5, 6 + sw]);
+      g.beginPath();
+      (el.points as [number, number][]).forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.stroke();
+      g.setLineDash([]);
+      return;
+    }
     const path = new Path2D();
     outlinePath(path, freedrawOutline(el, false));
     g.globalAlpha = ((el.opacity as number) ?? 100) / 100;
@@ -139,9 +155,8 @@ let counter = 0;
 const randomId = () => `hn${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 /** A new freedraw element, the way Excalidraw would create it, from the current pen settings. */
-export function newStroke(ctx: HandnoteContext, x: number, y: number, pressure: number): El {
+export function newStroke(ctx: HandnoteContext, x: number, y: number, pressure: number, simulatePressure = pressure === 0.5): El {
   const st = ctx.api.getAppState() as unknown as Record<string, unknown>;
-  const simulatePressure = pressure === 0.5;
   return {
     id: randomId(),
     type: "freedraw",

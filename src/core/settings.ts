@@ -1,8 +1,42 @@
 import { useSyncExternalStore } from "react";
 
-export type Template = "blank" | "lined" | "grid" | "dots";
-export type InkToolId = "pen" | "ballpoint" | "pencil" | "highlighter";
-export const INK_TOOLS: InkToolId[] = ["pen", "ballpoint", "pencil", "highlighter"];
+export type Template =
+  | "blank"
+  | "lined"
+  | "grid"
+  | "dots"
+  | "cornell"
+  | "lecture"
+  | "twocol"
+  | "mindmap"
+  | "revision"
+  | "isometric";
+export const TEMPLATES: { id: Template; name: string }[] = [
+  { id: "blank", name: "Blank" },
+  { id: "lined", name: "Lined" },
+  { id: "grid", name: "Grid" },
+  { id: "dots", name: "Dots" },
+  { id: "cornell", name: "Cornell" },
+  { id: "lecture", name: "Lecture" },
+  { id: "twocol", name: "Lines + grid" },
+  { id: "revision", name: "Revision" },
+  { id: "mindmap", name: "Mind map" },
+  { id: "isometric", name: "Isometric" },
+];
+export const isTemplate = (t: unknown): t is Template => TEMPLATES.some((x) => x.id === t);
+
+export type InkToolId = "pen" | "ballpoint" | "pencil" | "highlighter" | "dotted" | "dashed";
+export const INK_TOOLS: InkToolId[] = ["pen", "ballpoint", "pencil", "highlighter", "dotted", "dashed"];
+/** The pen types behind the one "Pen" button (its Line options). */
+export const PEN_TYPES: { id: InkToolId; name: string }[] = [
+  { id: "ballpoint", name: "Ballpoint" },
+  { id: "pen", name: "Fountain" },
+  { id: "dotted", name: "Dotted" },
+  { id: "dashed", name: "Dashed" },
+];
+/** Drawn as an Excalidraw line with a dotted/dashed stroke (not freehand ink). */
+export const isDashTool = (t: string): t is "dotted" | "dashed" => t === "dotted" || t === "dashed";
+export const MAX_PINNED = 3;
 
 export interface InkConfig {
   color: string;
@@ -23,8 +57,16 @@ export interface CoreSettings {
   ballpoint: InkConfig;
   pencil: InkConfig;
   highlighter: InkConfig;
+  dotted: InkConfig;
+  dashed: InkConfig;
   /** Favourite colours, shared by every tool */
   favourites: string[];
+  /** Sizes pinned to the second bar, per tool (mm for pens, px for erasers), at most MAX_PINNED. */
+  pinned: Record<string, number[]>;
+  /** Last pen type / eraser type used behind a grouped button ("pen" → "ballpoint"…). */
+  groupLast: Record<string, string>;
+  /** Top bar layout: button order and hidden buttons (ids of toolbar items). */
+  toolbar: { order: string[]; hidden: string[] };
 }
 
 /** Everything saved in data.json. Bump SETTINGS_VERSION and add a migration when the shape changes. */
@@ -47,7 +89,21 @@ export const DEFAULT_CORE: CoreSettings = {
   ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
   pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },
   highlighter: { color: "#ffe066", width: 6, opacity: 45 },
+  dotted: { color: "#1e1e1e", width: 2.2, opacity: 100 },
+  dashed: { color: "#1e1e1e", width: 2.2, opacity: 100 },
   favourites: ["#1e1e1e", "#1971c2", "#e03131", "#2f9e44"],
+  pinned: {
+    ballpoint: [0.5, 0.7, 1],
+    pen: [0.5, 0.7, 1],
+    pencil: [0.3, 0.5, 0.7],
+    dotted: [0.5, 0.7, 1],
+    dashed: [0.5, 0.7, 1],
+    highlighter: [3, 5, 8],
+    "precision-eraser": [8, 14, 22],
+    "object-eraser": [8, 14, 22],
+  },
+  groupLast: { pen: "ballpoint", eraser: "precision-eraser" },
+  toolbar: { order: [], hidden: [] },
 };
 
 /** 9 hues, 4 shades each (dark → light). */
@@ -75,20 +131,29 @@ export const HIGHLIGHTER_WIDTHS = [4, 6, 9];
 export const PX_PER_MM = 96 / 25.4;
 const typicalPressure = (tool: InkToolId) => (tool === "ballpoint" ? 0.6 : 0.5);
 const pxPerWidth = (tool: InkToolId) => 8.5 * Math.sin(((0.5 - 0.6 * (0.5 - typicalPressure(tool))) * Math.PI) / 2);
-export const widthToMm = (tool: InkToolId, width: number) => (width * pxPerWidth(tool)) / PX_PER_MM;
-export const mmToWidth = (tool: InkToolId, mm: number) => (mm * PX_PER_MM) / pxPerWidth(tool);
+/* Dotted/dashed are Excalidraw lines: drawn strokeWidth + 0.5 px thick. */
+export const widthToMm = (tool: InkToolId, width: number) =>
+  isDashTool(tool) ? (width + 0.5) / PX_PER_MM : (width * pxPerWidth(tool)) / PX_PER_MM;
+export const mmToWidth = (tool: InkToolId, mm: number) =>
+  isDashTool(tool) ? Math.max(0.3, mm * PX_PER_MM - 0.5) : (mm * PX_PER_MM) / pxPerWidth(tool);
+/** How thick the line is on screen (px) at a zoom. */
+export const inkPx = (tool: InkToolId, width: number, zoom: number) => widthToMm(tool, width) * PX_PER_MM * zoom;
 /** Quick sizes (mm) for the top bar and the panel. */
 export const MM_PRESETS: Record<InkToolId, number[]> = {
   pen: [0.3, 0.5, 0.7, 1, 1.5, 2],
   ballpoint: [0.3, 0.5, 0.7, 1, 1.5, 2],
   pencil: [0.3, 0.5, 0.7, 1, 1.5, 2],
-  highlighter: [3, 5, 8],
+  dotted: [0.3, 0.5, 0.7, 1, 1.5, 2],
+  dashed: [0.3, 0.5, 0.7, 1, 1.5, 2],
+  highlighter: [2, 3, 5, 8, 12],
 };
 /** Range of the size slider (mm). */
 export const MM_RANGE: Record<InkToolId, { min: number; max: number; step: number }> = {
   pen: { min: 0.1, max: 5, step: 0.05 },
   ballpoint: { min: 0.1, max: 5, step: 0.05 },
   pencil: { min: 0.1, max: 5, step: 0.05 },
+  dotted: { min: 0.2, max: 5, step: 0.05 },
+  dashed: { min: 0.2, max: 5, step: 0.05 },
   highlighter: { min: 1, max: 15, step: 0.5 },
 };
 export const sameMm = (a: number, b: number) => Math.abs(a - b) < 0.005;
@@ -156,6 +221,10 @@ export function loadSettings(raw: Raw | null): HandnoteSettings {
   s = stripUndefined(s);
   const core = { ...DEFAULT_CORE, ...(s.core ?? {}) };
   for (const k of INK_TOOLS) core[k] = { ...DEFAULT_CORE[k], ...(s.core?.[k] ?? {}) };
+  core.pinned = { ...DEFAULT_CORE.pinned, ...(s.core?.pinned ?? {}) };
+  core.groupLast = { ...DEFAULT_CORE.groupLast, ...(s.core?.groupLast ?? {}) };
+  core.toolbar = { order: [], hidden: [], ...(s.core?.toolbar ?? {}) };
+  if (!isTemplate(core.defaultTemplate)) core.defaultTemplate = DEFAULT_CORE.defaultTemplate;
   delete (core as Record<string, unknown>).toolbarStyle;
   return { version: SETTINGS_VERSION, core, features: s.features ?? {} };
 }

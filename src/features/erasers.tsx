@@ -1,20 +1,32 @@
 import type { HandnoteContext } from "../core/context";
+import { useSettings } from "../core/settings";
 import { defineFeature } from "../core/types";
+import { PinnedSizes, TypePicker } from "../core/ui";
 import { eraseAlong, eraseObjectsAlong } from "./eraser-geometry";
 
 type S = { size: number; objectSize: number };
 const ID = "erasers";
-export const ERASER_SIZES = [8, 14, 22, 34];
+export const ERASER_SIZES = [6, 8, 14, 22, 34, 50];
 const PRECISION = "precision-eraser";
 const OBJECT = "object-eraser";
 
 function SizePanel({ ctx }: { ctx: HandnoteContext }) {
+  useSettings(ctx.store);
   const object = ctx.state.tool === OBJECT;
   const s = ctx.featureSettings<S>(ID);
   const key = object ? "objectSize" : "size";
   return (
     <>
-      <div className="hn-panel-title">{object ? "Object eraser" : "Precision eraser"}</div>
+      <div className="hn-panel-title">Eraser</div>
+      <TypePicker
+        ctx={ctx}
+        title="Eraser type"
+        options={[
+          { id: PRECISION, name: "Precision" },
+          { id: OBJECT, name: "Whole strokes" },
+        ]}
+      />
+      <div className="hn-hint">{object ? "Removes every stroke it touches." : "Erases only what you rub over."}</div>
       <div className="hn-label">Size</div>
       <div className="hn-row">
         {ERASER_SIZES.map((v) => (
@@ -28,6 +40,7 @@ function SizePanel({ ctx }: { ctx: HandnoteContext }) {
           </button>
         ))}
       </div>
+      <PinnedSizes ctx={ctx} tool={ctx.state.tool} current={s[key]} format={(v) => `${v}`} same={(a, b) => a === b} />
     </>
   );
 }
@@ -49,6 +62,7 @@ export default defineFeature<S>({
       label: "Precision eraser",
       icon: "eraser",
       order: 30,
+      group: "eraser",
       // Excalidraw's eraser mode keeps fingers scrolling; the Pencil is handled here.
       activate: (c) => c.api.setActiveTool({ type: "eraser", locked: true }),
       Panel: SizePanel,
@@ -58,6 +72,7 @@ export default defineFeature<S>({
       label: "Object eraser",
       icon: "trash-2",
       order: 31,
+      group: "eraser",
       activate: (c) => c.api.setActiveTool({ type: "eraser", locked: true }),
       Panel: SizePanel,
     },

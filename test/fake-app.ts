@@ -30,6 +30,8 @@ export function fakeApp() {
       return add(new TFile(p));
     },
     readBinary: async (f: TFile) => data.get(f.path) as ArrayBuffer,
+    modify: async (f: TFile, d: string) => void data.set(f.path, d),
+    read: async (f: TFile) => data.get(f.path) as string,
     cachedRead: async (f: TFile) => data.get(f.path) as string,
     adapter: {
       readBinary: async (p: string) => data.get(p) as ArrayBuffer,

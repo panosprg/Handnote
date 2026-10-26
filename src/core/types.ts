@@ -32,6 +32,8 @@ export interface ToolDef {
   ink?: boolean;
   /** Lower comes first in toolbars. */
   order: number;
+  /** Tools in a group share one toolbar button (e.g. the pen types behind "Pen"). */
+  group?: string;
   /** Shown when the tool is tapped while already active (e.g. colour & size). */
   Panel?: ComponentType<{ ctx: HandnoteContext }>;
 }

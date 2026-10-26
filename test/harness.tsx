@@ -21,6 +21,7 @@ BUILT_IN_FEATURES.forEach((f) => w.registry.register(f));
 w.dirty = 0;
 w.pagesChanges = 0;
 w.PDFDocument = PDFDocument;
+w.parseNote = parseNote;
 
 /** Make a 2-page test PDF, import it like the plugin does, and return the note + assets. */
 w.makeAndImportPdf = async () => {
@@ -55,6 +56,11 @@ const mount = (raw: string, images: (string | undefined)[] = []) => {
           w.lastRequest = { url, ...init, body: JSON.parse(init.body) };
           const maths = init.headers.Accept === "application/x-latex";
           return { status: 200, text: maths ? "x^{2}-5x+6=0" : "Lecture 1 overview" };
+        },
+        print: async (pages?: number[]) => {
+          const bytes = await exportPdf(w.ctx, pages);
+          const doc = await PDFDocument.load(bytes);
+          w.printed = { pages: pages ?? null, count: doc.getPageCount() };
         },
         exportPdf: async () => {
           w.exportedPdf = await exportPdf(w.ctx);
@@ -108,6 +114,32 @@ if (q.has("library")) {
     w.importedNote = note;
     mount(json, images);
   });
+} else if (q.has("view")) {
+  // The real Obsidian view (HandnoteView) on a fake vault: saving, echoes, the saved dot.
+  (async () => {
+    const { HandnoteView } = await import("../src/view");
+    const app = fakeApp();
+    const raw = emptyNote("lined");
+    const file = await app.vault.create("Test.handnote", raw);
+    const plugin = { app, store: w.store, registry: w.registry };
+    const view = new HandnoteView({ app } as never, plugin as never);
+    (view as any).file = file;
+    const host = document.getElementById("app")!;
+    view.contentEl.style.cssText = "position:fixed;inset:0";
+    host.appendChild(view.contentEl);
+    view.setViewData(raw, true);
+    w.view = view;
+    w.fakeApp = app;
+    w.file = file;
+    w.fileText = () => app.data.get(file.path);
+    const wait = setInterval(() => {
+      if (view.ctx) {
+        w.ctx = view.ctx;
+        w.api = view.ctx.api;
+        clearInterval(wait);
+      }
+    }, 20);
+  })();
 } else if (q.has("bare")) {
   // Plain Excalidraw, no Handnote: a reference point for performance tests.
   const { Excalidraw } = require("@excalidraw/excalidraw");

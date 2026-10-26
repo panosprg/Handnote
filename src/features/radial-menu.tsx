@@ -35,7 +35,7 @@ function segmentPath(i: number, n: number) {
 }
 
 function layout(ctx: HandnoteContext) {
-  const tools = ctx.tools().filter((t) => t.id !== "hand");
+  const tools = ctx.groupedTools().filter((t) => t.id !== "hand");
   const colors = ctx.core.favourites.slice(0, 8);
   return { tools, colors };
 }

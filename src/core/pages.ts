@@ -9,7 +9,7 @@ export const PAGE_GAP = 36;
 
 export interface PagesInfo {
   /** Size of every page, in order. */
-  sizes: { w: number; h: number }[];
+  sizes: { w: number; h: number; template?: import("./settings").Template }[];
 }
 
 export interface PageRect {

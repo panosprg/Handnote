@@ -5,11 +5,15 @@ Handwritten notes for Obsidian, made for iPad + Apple Pencil, built on the Excal
 ## What it does
 
 - **Notebooks with pages** (A4, or the pages of an imported PDF), a library with covers and folders, export to PDF.
-- **Pens:** pen (even line, the default), fountain pen (pressure), pencil, highlighter (goes under the ink, snaps straight).
-  Sizes are in millimetres on the printed page: quick sizes in the second bar, an exact slider in the colour panel.
+- **Pens:** one Pen button with Line options (ballpoint, fountain, dotted, dashed), pencil, highlighter (goes under
+  the ink, snaps straight, even width). Sizes are in millimetres on the printed page: pin up to 3 to the second bar,
+  exact slider in the pen's menu.
+- **Paper:** blank, lined, grid, dots, Cornell, lecture, lines + grid, revision, mind map, isometric, per page.
+- **Top bar:** hold any button to rearrange or hide buttons. Green/red dot shows whether the notebook is saved.
+- **Print** all pages, the current page or a range (Notebook menu).
 - **Fast ink:** the line you're writing is drawn on its own layer straight from the Pencil and handed to
   Excalidraw when you lift it, so writing doesn't lag (about 12× less work per Pencil movement than plain Excalidraw).
-- **Erasers:** precision (only what you rub) and object (whole strokes), with an un-draw animation; scribble to delete.
+- **Erasers:** one Eraser button: precision (only what you rub) or whole strokes, with an un-draw animation; scribble to delete.
 - **Writing help:** shape-preserving stabilization, hold-to-snap shapes, ruler, Pencil-tip indicator.
 - **Selecting:** lasso and rectangle, one clean outline; selection bar with headings, links and Solve.
 - **Headings + outline**, **links to notes**, **maths solving** (the last two kinds of recognition need MyScript keys).

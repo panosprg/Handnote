@@ -6,8 +6,8 @@ import { Emitter } from "./emitter";
 import type { FeatureRegistry } from "./registry";
 import { INK_TOOLS, type CoreSettings, type HandnoteSettings, type InkToolId, type SettingsStore, type Template } from "./settings";
 import { PenPipeline } from "./pen";
-import { A4, type PagesInfo } from "./pages";
-import { CORE_TOOLS } from "./tools";
+import { A4, maxWidth, pageAt, type PagesInfo } from "./pages";
+import { CORE_TOOLS, TOOL_GROUPS } from "./tools";
 import type { ToolDef } from "./types";
 
 /** Loose element type: features only touch the fields they need. */
@@ -43,6 +43,9 @@ export interface UiState {
   pages: PagesInfo;
   /** Background image per page (imported PDFs), as data URLs */
   pageImages: (string | undefined)[];
+  /** Is the notebook saved? (the green/red dot) */
+  saveStatus: "saved" | "unsaved" | "saving" | "error";
+  saveError?: string;
 }
 
 /** Things only the Obsidian side can do (files, links), provided by the view. */
@@ -55,6 +58,10 @@ export interface HostActions {
   request(url: string, init: { method: string; headers: Record<string, string>; body: string }): Promise<{ status: number; text: string }>;
   /** vault path of this note */
   notePath(): string;
+  /** Print the notebook (all pages, or 0-based page indexes). */
+  print?(pages?: number[]): Promise<void>;
+  /** Save right now (the saved dot). */
+  saveNow?(): Promise<void>;
 }
 
 export interface CtxEvents extends Record<string, unknown[]> {
@@ -103,6 +110,7 @@ export class HandnoteContext {
       modal: false,
       pages: initial.pages,
       pageImages: [],
+      saveStatus: "saved",
     };
     this.pen = new PenPipeline(this);
     // Re-apply ink settings when colours/sizes change anywhere.
@@ -165,6 +173,35 @@ export class HandnoteContext {
     return [...CORE_TOOLS, ...extra].sort((a, b) => a.order - b.order);
   }
 
+  /**
+   * Tools as the toolbar and dial show them: a group (pen types, erasers) is one item,
+   * standing for its last-used member, labelled with the group's name.
+   */
+  groupedTools(): (ToolDef & { member: string; key: string })[] {
+    const out: (ToolDef & { member: string; key: string })[] = [];
+    const seen = new Set<string>();
+    for (const t of this.tools()) {
+      if (!t.group) {
+        out.push({ ...t, member: t.id, key: t.id });
+        continue;
+      }
+      if (seen.has(t.group)) continue;
+      seen.add(t.group);
+      const members = this.tools().filter((m) => m.group === t.group);
+      const activeMember = members.find((m) => m.id === this.state.tool);
+      const last = members.find((m) => m.id === this.core.groupLast[t.group!]);
+      const m = activeMember ?? last ?? members[0];
+      const g = TOOL_GROUPS[t.group];
+      out.push({ ...m, label: g?.label ?? m.label, icon: m.icon, member: m.id, key: `group:${t.group}` });
+    }
+    return out;
+  }
+
+  /** The other tools in the active tool's group (for its menu). */
+  groupMembers(group: string): ToolDef[] {
+    return this.tools().filter((t) => t.group === group);
+  }
+
   tool(id: string): ToolDef | undefined {
     return this.tools().find((t) => t.id === id);
   }
@@ -183,6 +220,8 @@ export class HandnoteContext {
       return;
     }
     def.activate(this);
+    if (def.group && this.core.groupLast[def.group] !== id)
+      this.store.updateCore({ groupLast: { ...this.core.groupLast, [def.group]: id } });
     this.setState({
       tool: id,
       lastInk: def.ink ? (id as InkToolId) : this.state.lastInk,
@@ -216,12 +255,46 @@ export class HandnoteContext {
     this.onPagesChange(pages);
   }
 
-  /** Adds a page after `index` (default: at the end), the same size as its neighbour. */
+  /** Adds a page after `index` (default: at the end), the same size and paper as its neighbour. */
   addPage(index = this.state.pages.sizes.length - 1) {
     const sizes = [...this.state.pages.sizes];
     const like = sizes[index] ?? A4;
-    sizes.splice(index + 1, 0, { w: like.w, h: like.h });
+    const tpl = (like as { template?: Template }).template;
+    sizes.splice(index + 1, 0, { w: like.w, h: like.h, ...(tpl ? { template: tpl } : {}) });
     this.setPages({ sizes });
+  }
+
+  /** The paper of one page (its own, or the notebook's). */
+  pageTemplate(index: number): Template {
+    return this.state.pages.sizes[index]?.template ?? this.state.template;
+  }
+
+  /** Change the paper of one page, or of the whole notebook ("all" also clears per-page choices). */
+  setPageTemplate(target: number | "all", t: Template) {
+    if (target === "all") {
+      const sizes = this.state.pages.sizes.map(({ w, h }) => ({ w, h }));
+      if (sizes.some((s, i) => this.state.pages.sizes[i].template)) this.setPages({ sizes });
+      this.setTemplate(t);
+      return;
+    }
+    const sizes = this.state.pages.sizes.map((s, i) => {
+      if (i !== target) return s;
+      const { w, h } = s;
+      return t === this.state.template ? { w, h } : { w, h, template: t };
+    });
+    this.setPages({ sizes });
+  }
+
+  /** The page in the middle of the screen (0-based). */
+  currentPage(): number {
+    const st = this.api.getAppState();
+    return pageAt(this.state.pages, this.root.clientHeight / 2 / st.zoom.value - st.scrollY);
+  }
+
+  /** The furthest you can zoom out: the page fills the screen width (like Goodnotes). */
+  minZoom(): number {
+    const vw = this.root.clientWidth || 800;
+    return Math.max(0.1, (vw - 48) / maxWidth(this.state.pages));
   }
 
   /* ---------- history ---------- */

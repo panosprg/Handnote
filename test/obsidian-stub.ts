@@ -9,7 +9,7 @@ const ICONS: Record<string, string> = {
   "more-horizontal": "…", move: "✥", star: "★", "pen-tool": "✒", pen: "🖊", pencil: "✏",
   type: "T", scan: "⬚", plus: "+", "file-plus": "⊕", "file-down": "⤓", folder: "📁",
   "notebook-pen": "📓", "folder-plus": "📁+", "file-text": "📄", "list-tree": "☰", ruler: "📏",
-  link: "🔗", unlink: "⛓", sigma: "Σ", "heading-1": "H1", "heading-2": "H2", "heading-3": "H3", heading: "H",
+  link: "🔗", unlink: "⛓", sigma: "Σ", printer: "⎙", "layout-grid": "▦", "heading-1": "H1", "heading-2": "H2", "heading-3": "H3", heading: "H",
 };
 export function setIcon(el: HTMLElement, name: string) {
   el.textContent = ICONS[name] ?? "?";
@@ -67,3 +67,49 @@ export class Modal extends Stub {
 }
 export class Setting extends Stub {}
 export class ItemView extends Stub {}
+
+export const Platform = { isMobile: false };
+export const requestUrl = async () => ({ status: 200, text: "" });
+export class FuzzySuggestModal extends Modal {
+  setPlaceholder() {}
+}
+
+/** Enough of Obsidian's TextFileView to run HandnoteView: save() writes getViewData() to the fake vault. */
+export class TextFileView {
+  data = "";
+  file: TFile | null = null;
+  app: any;
+  contentEl: HTMLElement;
+  constructor(public leaf: any) {
+    this.app = leaf.app;
+    const el = document.createElement("div") as any;
+    el.addClass = (c: string) => el.classList.add(c);
+    el.empty = () => el.replaceChildren();
+    el.createDiv = ({ cls }: { cls: string }) => {
+      const d = document.createElement("div");
+      d.className = cls;
+      el.appendChild(d);
+      return d;
+    };
+    this.contentEl = el;
+  }
+  requestSave() {
+    void this.save();
+  }
+  async save() {
+    if (!this.file) return;
+    const d = this.getViewData();
+    const w = window as any;
+    if (w.failSave) throw new Error(w.failSave);
+    await this.app.vault.modify(this.file, d);
+    w.saves = (w.saves ?? 0) + 1;
+  }
+  async onUnloadFile(_f: TFile) {
+    await this.save();
+  }
+  getViewData() {
+    return "";
+  }
+  setViewData(_d: string, _c: boolean) {}
+  clear() {}
+}
