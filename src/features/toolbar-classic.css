@@ -88,3 +88,32 @@
 .hn-panel.hn-panel-top {
   top: 62px;
 }
+
+/* quick options for the active tool */
+.hn-wheel-mini {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: conic-gradient(#ff5f6d, #ffc371, #f9f871, #6bdc8b, #4fc3f7, #7c83ff, #d36bff, #ff5f6d);
+}
+.hn-wheel-mini span {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--hn-paper);
+}
+.hn-dark .hn-wheel-mini span {
+  filter: invert(93%) hue-rotate(180deg);
+}
+.hn-root button.hn-btn.hn-size-quick {
+  width: 34px;
+}
+.hn-size-quick > span {
+  display: block;
+  border-radius: 50%;
+}
+.hn-dark .hn-size-quick > span:not(.hn-eraser-dot) {
+  filter: invert(93%) hue-rotate(180deg);
+}
