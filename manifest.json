@@ -1,7 +1,7 @@
 {
   "id": "handnote",
   "name": "Handnote",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "minAppVersion": "1.5.7",
   "description": "Handwritten notes for Obsidian, built on the Excalidraw engine. Made for iPad and Apple Pencil.",
   "author": "Panos Prag",
