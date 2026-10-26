@@ -24,7 +24,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "Handnote ${GITHUB_REF_NAME}" \
-            --generate-notes \
-            build/main.js build/manifest.json build/styles.css
+          FILES="build/main.js build/manifest.json build/styles.css"
+          # Works both for a pushed tag and for a release drafted on github.com.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" $FILES --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" --title "Handnote ${GITHUB_REF_NAME}" --generate-notes $FILES
+          fi
