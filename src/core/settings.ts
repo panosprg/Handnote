@@ -45,6 +45,11 @@ export interface InkConfig {
 }
 
 export interface CoreSettings {
+  /** The one folder all of Handnote's files live in (notebooks, quick notes, PDF pages, exports). */
+  rootFolder: string;
+  /** Has the "move everything into the Handnote folder" offer been shown? */
+  tidyOffered: boolean;
+  /** Where notebooks went before 0.9 (only used to find and move them). */
   notesFolder: string;
   quickNotesFolder: string;
   defaultTemplate: Template;
@@ -80,6 +85,8 @@ export interface HandnoteSettings {
 export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_CORE: CoreSettings = {
+  rootFolder: "Handnote",
+  tidyOffered: false,
   notesFolder: "Handwritten",
   quickNotesFolder: "Quick Notes",
   defaultTemplate: "lined",
@@ -159,6 +166,18 @@ export const MM_RANGE: Record<InkToolId, { min: number; max: number; step: numbe
 export const sameMm = (a: number, b: number) => Math.abs(a - b) < 0.005;
 export const formatMm = (mm: number) => `${mm < 1 ? mm.toFixed(2).replace(/0$/, "") : mm.toFixed(1).replace(/\.0$/, "")} mm`;
 export const MAX_FAVOURITES = 8;
+
+/**
+ * Everything Handnote makes goes inside one folder:
+ *   Handnote/                notebooks and your own folders of notebooks
+ *   Handnote/Quick Notes/    quick notes
+ *   Handnote/Attachments/    page images of imported PDFs
+ *   Handnote/Exports/        exported and printed PDFs
+ */
+export function handnoteFolders(core: Pick<CoreSettings, "rootFolder">) {
+  const root = (core.rootFolder || "Handnote").trim().replace(/^\/+|\/+$/g, "") || "Handnote";
+  return { root, quick: `${root}/Quick Notes`, attachments: `${root}/Attachments`, exports: `${root}/Exports` };
+}
 
 /* ------------------------------------------------------------------ */
 /* Migrations: one function per version step. Never edit an old one. */

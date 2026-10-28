@@ -17,7 +17,8 @@ import Canvas from "./core/Canvas";
 import type { HandnoteContext, HostActions } from "./core/context";
 import { exportPdf } from "./core/export";
 import type { PagesInfo } from "./core/pages";
-import type { Template } from "./core/settings";
+import { handnoteFolders, type Template } from "./core/settings";
+import { ensureFolder } from "./pdf-import";
 import { parseNote, type HandnoteFile } from "./data";
 import type HandnotePlugin from "./main";
 
@@ -222,7 +223,9 @@ export class HandnoteView extends TextFileView {
           return;
         }
         // iPad: make the PDF, then hand it to iPadOS (share sheet → Print).
-        const path = normalizePath(`${this.file.parent?.path ?? ""}/${this.file.basename} (print).pdf`);
+        const exportsDir = handnoteFolders(this.plugin.store.get().core).exports;
+        await ensureFolder(this.app, exportsDir);
+        const path = normalizePath(`${exportsDir}/${this.file.basename} (print).pdf`);
         await this.writePdf(path, bytes);
         const openWith = (this.app as unknown as { openWithDefaultApp?: (p: string) => unknown }).openWithDefaultApp;
         if (openWith) {
@@ -255,7 +258,10 @@ export class HandnoteView extends TextFileView {
       const notice = new Notice("Handnote: making the PDF…", 0);
       try {
         const bytes = await exportPdf(this.ctx);
-        const path = normalizePath(`${this.file.parent?.path ?? ""}/${this.file.basename}.pdf`);
+        // In Handnote/Exports (never next to the notebook: that could overwrite the PDF it was made from).
+        const exportsDir = handnoteFolders(this.plugin.store.get().core).exports;
+        await ensureFolder(this.app, exportsDir);
+        const path = normalizePath(`${exportsDir}/${this.file.basename}.pdf`);
         await this.writePdf(path, bytes);
         notice.hide();
         new Notice(`Saved ${path}. Open it from your vault to print or share it.`);

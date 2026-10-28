@@ -4,6 +4,9 @@ Handwritten notes for Obsidian, made for iPad + Apple Pencil, built on the Excal
 
 ## What it does
 
+- **One folder:** everything Handnote makes lives in `Handnote/` (notebooks and your folders, `Quick Notes`,
+  `Attachments` for PDF pages, `Exports` for exported/printed PDFs). Settings → Handnote → Tidy up moves files
+  from older versions in.
 - **Notebooks with pages** (A4, or the pages of an imported PDF), a library with covers and folders, export to PDF.
 - **Pens:** one Pen button with Line options (ballpoint, fountain, dotted, dashed), pencil, highlighter (goes under
   the ink, snaps straight, even width). Sizes are in millimetres on the printed page: pin up to 3 to the second bar,

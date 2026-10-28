@@ -8,6 +8,11 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.9.0 (28 Oct 2026)
+- Everything in one `Handnote` folder (Quick Notes, Attachments, Exports inside); library shows only that folder;
+  one-time "Tidy up" offer moves older files in (links updated, imported PDFs left alone, empty old folders removed).
+- Fixed: exporting a notebook made from a PDF could overwrite the original PDF (exports now go to Handnote/Exports).
+
 ### 0.8.0 (27 Oct 2026)
 1. Highlighter keeps its size when it straightens (even width, no pressure).
 2. Zoom-out stops when the page fills the screen width.

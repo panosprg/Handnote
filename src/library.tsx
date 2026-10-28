@@ -14,6 +14,7 @@ import {
   type WorkspaceLeaf,
 } from "obsidian";
 import { COVER_COLOURS } from "./data";
+import { ensureFolder } from "./pdf-import";
 import type HandnotePlugin from "./main";
 
 import "./library.css";
@@ -121,7 +122,12 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
     return () => refs.forEach((r) => app.vault.offref(r));
   }, [app]);
 
-  const folder = (app.vault.getAbstractFileByPath(path || "/") as TFolder | null) ?? app.vault.getRoot();
+  // The library shows the Handnote folder (everything Handnote makes lives there).
+  const rootPath = plugin.folders().root;
+  const rootFolder = app.vault.getAbstractFileByPath(rootPath) as TFolder | null;
+  const inRoot = (p: string) => p === rootPath || p.startsWith(rootPath + "/");
+  const folder =
+    ((inRoot(path) ? app.vault.getAbstractFileByPath(path) : null) as TFolder | null) ?? rootFolder ?? app.vault.getRoot();
   const folders = folder.children.filter((c): c is TFolder => c instanceof TFolder && hasNotebooks(c));
   const notebooks = useMemo(
     () =>
@@ -186,11 +192,17 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
         .setTitle("Move to folder…")
         .setIcon("folder-input")
         .onClick(() =>
-          new PromptModal(app, "Move to folder (path)", f.parent?.path ?? "", async (v) => {
-            const dest = normalizePath(v || "/");
-            if (dest !== "/" && !app.vault.getAbstractFileByPath(dest)) await app.vault.createFolder(dest);
-            await app.fileManager.renameFile(f, normalizePath(`${dest === "/" ? "" : dest + "/"}${f.name}`));
-          }).open(),
+          new PromptModal(
+            app,
+            `Move to folder (inside “${rootPath}”, empty = top level)`,
+            inRoot(f.parent?.path ?? "") ? (f.parent?.path ?? "").slice(rootPath.length + 1) : "",
+            async (v) => {
+              const rel = (v ?? "").trim().replace(/^\/+|\/+$/g, "");
+              const dest = normalizePath(rel ? `${rootPath}/${rel}` : rootPath);
+              await ensureFolder(app, dest);
+              await app.fileManager.renameFile(f, normalizePath(`${dest}/${f.name}`));
+            },
+          ).open(),
         ),
     );
     m.addItem((i) =>
@@ -248,26 +260,26 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
     };
   };
 
-  const crumbs = folder.path === "/" ? [] : folder.path.split("/");
+  const crumbs = folder.path === rootPath || !inRoot(folder.path) ? [] : folder.path.slice(rootPath.length + 1).split("/");
 
   return (
     <div className="hn-lib">
       <div className="hn-lib-head">
         <div className="hn-lib-crumbs">
-          <button className="hn-lib-crumb" onClick={() => setPath("/")}>
+          <button className="hn-lib-crumb" onClick={() => setPath(rootPath)}>
             Notebooks
           </button>
           {crumbs.map((c, i) => (
             <span key={i}>
               <span className="hn-lib-sep">›</span>
-              <button className="hn-lib-crumb" onClick={() => setPath(crumbs.slice(0, i + 1).join("/"))}>
+              <button className="hn-lib-crumb" onClick={() => setPath(`${rootPath}/${crumbs.slice(0, i + 1).join("/")}`)}>
                 {c}
               </button>
             </span>
           ))}
         </div>
         <div className="hn-lib-actions">
-          <button className="hn-lib-btn" onClick={() => plugin.createNote(folder.path, "Notebook")}>
+          <button className="hn-lib-btn" onClick={() => plugin.createNote(rootFolder ? folder.path : rootPath, "Notebook")}>
             <Icon name="notebook-pen" /> New notebook
           </button>
           <button
@@ -275,8 +287,9 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
             onClick={() =>
               new PromptModal(app, "New folder", "", async (v) => {
                 if (!v) return;
-                const p = normalizePath(`${folder.path === "/" ? "" : folder.path + "/"}${v}`);
-                if (!app.vault.getAbstractFileByPath(p)) await app.vault.createFolder(p);
+                const base = rootFolder ? folder.path : rootPath;
+                const p = normalizePath(`${base}/${v}`);
+                await ensureFolder(app, p);
                 // An empty folder has no notebooks yet: put a first one in so it shows.
                 await plugin.createNote(p, "Notebook", undefined, false);
               }).open()
@@ -284,7 +297,7 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
           >
             <Icon name="folder-plus" /> New folder
           </button>
-          <button className="hn-lib-btn" onClick={() => plugin.pickPdfToImport()}>
+          <button className="hn-lib-btn" onClick={() => plugin.pickPdfToImport(rootFolder ? folder.path : rootPath)}>
             <Icon name="file-text" /> Import PDF
           </button>
         </div>

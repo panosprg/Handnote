@@ -43,5 +43,36 @@ export function fakeApp() {
     on: () => ({}),
     offref: () => {},
   };
-  return { vault, workspace: {}, data, files };
+  /** Move a file or a whole folder (like Obsidian's fileManager.renameFile). */
+  const renameFile = async (f: TFile | TFolder, to: string) => {
+    const from = f.path;
+    if (files.has(to)) throw new Error(`exists: ${to}`);
+    const old = parentOf(from);
+    old.children = old.children.filter((c) => c !== f);
+    const moveOne = (x: TFile | TFolder, newPath: string) => {
+      files.delete(x.path);
+      if (data.has(x.path)) {
+        data.set(newPath, data.get(x.path)!);
+        data.delete(x.path);
+      }
+      x.path = newPath;
+      files.set(newPath, x);
+      if (x instanceof TFolder) for (const c of x.children) moveOne(c as TFile | TFolder, `${newPath}/${c.name}`);
+    };
+    moveOne(f, to);
+    const parent = parentOf(to);
+    f.parent = parent;
+    parent.children.push(f);
+  };
+  Object.assign(vault, {
+    process: async (f: TFile, fn: (s: string) => string) => void data.set(f.path, fn(data.get(f.path) as string)),
+    delete: async (f: TFile | TFolder) => {
+      files.delete(f.path);
+      data.delete(f.path);
+      const p = parentOf(f.path);
+      p.children = p.children.filter((c) => c !== f);
+    },
+    exists: async (p: string) => files.has(p),
+  });
+  return { vault, workspace: {}, data, files, fileManager: { renameFile } };
 }

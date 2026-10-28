@@ -7,19 +7,32 @@ const RENDER_SCALE = 2; // page images at ~192 dpi
 /**
  * Turns a PDF into a notebook: each PDF page becomes a page of the notebook
  * with the PDF page as its locked background image, ready to write on.
- * Page images are saved in a folder next to the notebook.
+ * The notebook goes in `dest.folder`, its page images in `dest.attachments/<name> pages`
+ * (both inside the Handnote folder, so nothing is scattered around the vault).
  */
-export async function importPdf(app: App, pdf: TFile, onProgress?: (done: number, total: number) => void): Promise<TFile> {
+export async function importPdf(
+  app: App,
+  pdf: TFile,
+  dest: { folder: string; attachments: string },
+  onProgress?: (done: number, total: number) => void,
+): Promise<TFile> {
   const pdfjs = await loadPdfJs();
   const data = new Uint8Array(await app.vault.readBinary(pdf));
   const doc = await pdfjs.getDocument({ data }).promise;
   const total: number = doc.numPages;
 
-  const folder = pdf.parent?.path && pdf.parent.path !== "/" ? pdf.parent.path + "/" : "";
+  const folder = dest.folder && dest.folder !== "/" ? normalizePath(dest.folder) + "/" : "";
   let base = pdf.basename;
-  for (let i = 2; app.vault.getAbstractFileByPath(normalizePath(`${folder}${base}.handnote`)); i++) base = `${pdf.basename} (${i})`;
-  const assetDir = normalizePath(`${folder}${base} (pages)`);
-  if (!app.vault.getAbstractFileByPath(assetDir)) await app.vault.createFolder(assetDir);
+  for (
+    let i = 2;
+    app.vault.getAbstractFileByPath(normalizePath(`${folder}${base}.handnote`)) ||
+    app.vault.getAbstractFileByPath(normalizePath(`${dest.attachments}/${base} pages`));
+    i++
+  )
+    base = `${pdf.basename} (${i})`;
+  await ensureFolder(app, folder || "/");
+  const assetDir = normalizePath(`${dest.attachments}/${base} pages`);
+  await ensureFolder(app, assetDir);
 
   const sizes: PagesInfo["sizes"] = [];
   const assets: PdfPageAsset[] = [];
@@ -48,4 +61,13 @@ export async function importPdf(app: App, pdf: TFile, onProgress?: (done: number
   const pages: PagesInfo = { sizes };
   // The PDF pages are drawn as the paper itself (see Paper.tsx), not as objects you could move or erase.
   return app.vault.create(normalizePath(`${folder}${base}.handnote`), emptyNote("blank", { pages, pdf: { source: pdf.path, assets } }));
+}
+
+/** Creates a folder and any missing parents. */
+export async function ensureFolder(app: App, path: string) {
+  let current = "";
+  for (const part of normalizePath(path).split("/").filter(Boolean)) {
+    current = current ? `${current}/${part}` : part;
+    if (!app.vault.getAbstractFileByPath(current)) await app.vault.createFolder(current);
+  }
 }

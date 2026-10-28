@@ -36,7 +36,7 @@ w.makeAndImportPdf = async () => {
   const app = fakeApp();
   await app.vault.createFolder("Lectures");
   const pdf = await app.vault.createBinary("Lectures/Week 1.pdf", bytes.buffer as ArrayBuffer);
-  const note = await importPdf(app as never, pdf as never);
+  const note = await importPdf(app as never, pdf as never, { folder: "Handnote", attachments: "Handnote/Attachments" });
   w.fakeApp = app;
   return { path: note.path, json: app.data.get(note.path) };
 };
@@ -90,14 +90,22 @@ if (q.has("library")) {
     void json;
     const mk = async (p: string, cover: string, pages: number) =>
       app.vault.create(p, JSON.stringify({ handnote: { version: 2, cover, pages: { sizes: Array(pages).fill({ w: 794, h: 1123 }) } } }));
-    await app.vault.createFolder("Deree");
-    await app.vault.createFolder("Deree/MIS 2101");
-    await mk("Deree/MIS 2101/Lecture notes.handnote", "#3b5bdb", 12);
-    await mk("Ideas.handnote", "#e8590c", 3);
-    await mk("Gym log.handnote", "#2b8a3e", 1);
-    await mk("Reading notes.handnote", "#5f3dc4", 7);
+    await app.vault.createFolder("Handnote/Deree");
+    await app.vault.createFolder("Handnote/Deree/MIS 2101");
+    await mk("Handnote/Deree/MIS 2101/Lecture notes.handnote", "#3b5bdb", 12);
+    await mk("Handnote/Ideas.handnote", "#e8590c", 3);
+    await mk("Handnote/Gym log.handnote", "#2b8a3e", 1);
+    await mk("Handnote/Reading notes.handnote", "#5f3dc4", 7);
+    // Files outside the Handnote folder must not show up in the library.
+    await mk("Elsewhere.handnote", "#000000", 1);
     w.created = [];
-    const plugin = { app, createNote: async (f: string) => w.created.push(f), pickPdfToImport: () => {}, setCover: () => {} };
+    const plugin = {
+      app,
+      folders: () => ({ root: "Handnote", quick: "Handnote/Quick Notes", attachments: "Handnote/Attachments", exports: "Handnote/Exports" }),
+      createNote: async (f: string) => w.created.push(f),
+      pickPdfToImport: (f?: string) => (w.importInto = f),
+      setCover: () => {},
+    };
     createRoot(document.getElementById("app")!).render(<LibraryDemo plugin={plugin} />);
     w.libraryReady = true;
   })();
@@ -114,6 +122,40 @@ if (q.has("library")) {
     w.importedNote = note;
     mount(json, images);
   });
+} else if (q.has("tidy")) {
+  // A vault from before 0.9: Handnote files scattered around.
+  (async () => {
+    const { planTidy, applyTidy } = await import("../src/tidy");
+    const app = fakeApp();
+    const note = (extra = {}) => emptyNote("lined", extra);
+    await app.vault.createFolder("Handwritten");
+    await app.vault.createFolder("Handwritten/Deree");
+    await app.vault.createFolder("Quick Notes");
+    await app.vault.createFolder("Week 1 (pages)");
+    await app.vault.createFolder("Notes");
+    await app.vault.create("Handwritten/Lecture.handnote", note());
+    await app.vault.createBinary("Handwritten/Lecture.pdf", new ArrayBuffer(4));
+    await app.vault.create("Handwritten/Deree/MIS.handnote", note());
+    await app.vault.create("Quick Notes/Quick note 1.handnote", note());
+    await app.vault.createBinary("Week 1 (pages)/page 001.jpg", new ArrayBuffer(4));
+    await app.vault.createBinary("Week 1.pdf", new ArrayBuffer(4)); // the PDF the notebook was made from
+    await app.vault.createBinary("Week 1 (print).pdf", new ArrayBuffer(4));
+    await app.vault.create(
+      "Week 1.handnote",
+      note({ pdf: { source: "Week 1.pdf", assets: [{ fileId: "a", path: "Week 1 (pages)/page 001.jpg" }] } }),
+    );
+    await app.vault.create("Notes/Diary.md", "# my own note");
+    const core = w.store.get().core;
+    w.fakeApp = app;
+    w.plan = await planTidy(app as never, core);
+    w.runTidy = async () => {
+      w.moved = await applyTidy(app as never, w.plan);
+      w.paths = [...app.files.keys()].sort();
+      w.week1 = JSON.parse(app.data.get("Handnote/Week 1.handnote") as string);
+      w.plan2 = await planTidy(app as never, core);
+    };
+    w.tidyReady = true;
+  })();
 } else if (q.has("view")) {
   // The real Obsidian view (HandnoteView) on a fake vault: saving, echoes, the saved dot.
   (async () => {

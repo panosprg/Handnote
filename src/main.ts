@@ -1,14 +1,15 @@
 import "@excalidraw/excalidraw/index.css";
 import "./core/styles.css";
-import { App, FuzzySuggestModal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath } from "obsidian";
+import { App, FuzzySuggestModal, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath } from "obsidian";
 
 import { FeatureRegistry } from "./core/registry";
-import { loadSettings, SettingsStore, type CoreSettings, type Template } from "./core/settings";
+import { handnoteFolders, loadSettings, SettingsStore, TEMPLATES, type CoreSettings, type Template } from "./core/settings";
 import type { HandnoteFeature } from "./core/types";
 import { emptyNote } from "./data";
 import { BUILT_IN_FEATURES } from "./features";
 import { LibraryView, VIEW_TYPE_LIBRARY } from "./library";
-import { importPdf } from "./pdf-import";
+import { ensureFolder, importPdf } from "./pdf-import";
+import { applyTidy, describePlan, isEmptyPlan, planTidy, type TidyPlan } from "./tidy";
 import { HandnoteView, VIEW_TYPE_HANDNOTE } from "./view";
 
 /** What other plugins get from `app.plugins.plugins["panos-handnote"].api`. */
@@ -30,6 +31,36 @@ class PdfPicker extends FuzzySuggestModal<TFile> {
   }
   onChooseItem(f: TFile) {
     this.pick(f);
+  }
+}
+
+/** Asks before moving anything. */
+class TidyModal extends Modal {
+  constructor(app: App, private plan: TidyPlan, private root: string, private onAnswer: (move: boolean) => void) {
+    super(app);
+  }
+  onOpen() {
+    const { contentEl } = this;
+    this.setTitle("Put all Handnote files in one folder?");
+    contentEl.createEl("p", {
+      text: `Handnote now keeps everything in the “${this.root}” folder, so your file list stays tidy. It found ${describePlan(this.plan)} elsewhere in your vault.`,
+    });
+    contentEl.createEl("p", {
+      text: "Move them there? Links to your notebooks are updated, and PDFs you imported stay where they are.",
+    });
+    const row = contentEl.createDiv({ cls: "modal-button-container" });
+    row.createEl("button", { text: "Not now" }).onclick = () => {
+      this.onAnswer(false);
+      this.close();
+    };
+    const yes = row.createEl("button", { text: "Move them", cls: "mod-cta" });
+    yes.onclick = () => {
+      this.onAnswer(true);
+      this.close();
+    };
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 }
 
@@ -82,20 +113,25 @@ export default class HandnotePlugin extends Plugin {
 
     const core = () => this.store.get().core;
     this.addRibbonIcon("library", "Notebooks", () => this.openLibrary());
-    this.addRibbonIcon("notebook-pen", "New notebook", () => this.createNote(core().notesFolder, "Notebook"));
-    this.addRibbonIcon("sticky-note", "New quick note", () => this.createNote(core().quickNotesFolder, "Quick note"));
+    this.addRibbonIcon("notebook-pen", "New notebook", () => this.createNote(this.folders().root, "Notebook"));
+    this.addRibbonIcon("sticky-note", "New quick note", () => this.createNote(this.folders().quick, "Quick note"));
     this.addCommand({ id: "open-library", name: "Open notebooks library", callback: () => this.openLibrary() });
     this.addCommand({
       id: "new-note",
       name: "New notebook",
-      callback: () => this.createNote(core().notesFolder, "Notebook"),
+      callback: () => this.createNote(this.folders().root, "Notebook"),
     });
     this.addCommand({
       id: "new-quick-note",
       name: "New quick note",
-      callback: () => this.createNote(core().quickNotesFolder, "Quick note"),
+      callback: () => this.createNote(this.folders().quick, "Quick note"),
     });
     this.addCommand({ id: "import-pdf", name: "Write on a PDF", callback: () => this.pickPdfToImport() });
+    this.addCommand({ id: "tidy-up", name: "Move all Handnote files into the Handnote folder", callback: () => void this.tidyUp(true) });
+    // Once, after updating: offer to move files from older versions into the one folder.
+    this.app.workspace.onLayoutReady(() => {
+      if (!this.store.get().core.tidyOffered) window.setTimeout(() => void this.tidyUp(false), 1500);
+    });
     this.addCommand({
       id: "export-pdf",
       name: "Export notebook as PDF",
@@ -144,21 +180,58 @@ export default class HandnotePlugin extends Plugin {
     }, 500);
   }
 
+  /** Where Handnote's files go (all inside one folder). */
+  folders() {
+    return handnoteFolders(this.store.get().core);
+  }
+
+  /** Offer (or run, from settings / the command) the move into the Handnote folder. */
+  async tidyUp(fromUser: boolean) {
+    const core = this.store.get().core;
+    const plan = await planTidy(this.app, core);
+    if (isEmptyPlan(plan)) {
+      if (!core.tidyOffered) this.store.updateCore({ tidyOffered: true });
+      if (fromUser) new Notice(`Handnote: everything is already in the “${this.folders().root}” folder.`);
+      return;
+    }
+    new TidyModal(this.app, plan, this.folders().root, async (move) => {
+      this.store.updateCore({ tidyOffered: true });
+      if (!move) {
+        new Notice("Handnote: OK. You can do it any time from Settings → Handnote.");
+        return;
+      }
+      const n = new Notice("Handnote: moving files…", 0);
+      try {
+        const moved = await applyTidy(this.app, plan);
+        n.hide();
+        new Notice(`Handnote: moved ${moved} item${moved === 1 ? "" : "s"} into “${this.folders().root}”.`);
+      } catch (e) {
+        n.hide();
+        console.error(e);
+        new Notice(`Handnote: couldn't move everything (${(e as Error).message}). Nothing was deleted.`);
+      }
+    }).open();
+  }
+
   async openLibrary() {
+    await this.ensureFolder(this.folders().root);
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_LIBRARY)[0];
     const leaf = existing ?? this.app.workspace.getLeaf("tab");
     if (!existing) await leaf.setViewState({ type: VIEW_TYPE_LIBRARY, active: true });
     this.app.workspace.revealLeaf(leaf);
   }
 
-  pickPdfToImport() {
-    new PdfPicker(this.app, (f) => this.annotatePdf(f)).open();
+  pickPdfToImport(folder?: string) {
+    new PdfPicker(this.app, (f) => this.annotatePdf(f, folder)).open();
   }
 
-  async annotatePdf(pdf: TFile) {
+  async annotatePdf(pdf: TFile, folder?: string) {
     const notice = new Notice(`Handnote: preparing "${pdf.basename}"…`, 0);
     try {
-      const file = await importPdf(this.app, pdf, (n, total) => notice.setMessage(`Handnote: preparing page ${n} of ${total}…`));
+      const dirs = this.folders();
+      const file = await importPdf(this.app, pdf, { folder: folder ?? dirs.root, attachments: dirs.attachments }, (n, total) =>
+        notice.setMessage(`Handnote: preparing page ${n} of ${total}…`),
+      );
       notice.hide();
       await this.app.workspace.getLeaf("tab").openFile(file);
     } catch (e) {
@@ -178,11 +251,7 @@ export default class HandnotePlugin extends Plugin {
   }
 
   private async ensureFolder(path: string) {
-    let current = "";
-    for (const part of normalizePath(path).split("/").filter(Boolean)) {
-      current = current ? `${current}/${part}` : part;
-      if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
-    }
+    await ensureFolder(this.app, path);
   }
 
   async createNote(folder: string, prefix: string, template: Template = this.store.get().core.defaultTemplate, open = true) {
@@ -222,14 +291,18 @@ class HandnoteSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Notes").setHeading();
     new Setting(containerEl)
-      .setName("Handwritten notes folder")
-      .addText((t) => t.setValue(s.core.notesFolder).onChange((v) => setCore({ notesFolder: v.trim() })));
+      .setName("Handnote folder")
+      .setDesc("Everything Handnote makes goes in this one folder: notebooks, Quick Notes, PDF pages (Attachments) and exported PDFs (Exports).")
+      .addText((t) =>
+        t.setValue(s.core.rootFolder).onChange((v) => setCore({ rootFolder: v.trim().replace(/^\/+|\/+$/g, "") || "Handnote" })),
+      );
     new Setting(containerEl)
-      .setName("Quick Notes folder")
-      .addText((t) => t.setValue(s.core.quickNotesFolder).onChange((v) => setCore({ quickNotesFolder: v.trim() })));
+      .setName("Tidy up")
+      .setDesc("Move Handnote files that are elsewhere in your vault (from older versions) into the Handnote folder.")
+      .addButton((b) => b.setButtonText("Move them").onClick(() => void this.plugin.tidyUp(true)));
     new Setting(containerEl).setName("Default paper").addDropdown((d) =>
       d
-        .addOptions({ blank: "Blank", lined: "Lined", grid: "Grid", dots: "Dots" })
+        .addOptions(Object.fromEntries(TEMPLATES.map((t) => [t.id, t.name])))
         .setValue(s.core.defaultTemplate)
         .onChange((v) => setCore({ defaultTemplate: v as Template })),
     );

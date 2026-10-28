@@ -75,14 +75,14 @@ def undo(page):
 with sync_playwright() as p:
     browser = p.chromium.launch()
 
-    def open_page(query="", free_zoom=True):
+    def open_page(query="", free_zoom=True, ready="window.api !== undefined"):
         ctx = browser.new_context(viewport={"width": 1180, "height": 820}, has_touch=True, device_scale_factor=2)
         page = ctx.new_page()
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("console", lambda m: m.type == "error" and errors.append("console: " + m.text))
         page.goto(URL + query)
-        page.wait_for_function("window.api !== undefined")
+        page.wait_for_function(ready, timeout=30000)
         page.wait_for_timeout(700)
         # Most checks draw at 100% zoom; the zoom-out limit (page fills the width) has its own test.
         if free_zoom:
@@ -126,7 +126,9 @@ with sync_playwright() as p:
     note = page.evaluate("window.importedNote")
     check("PDF import makes one notebook page per PDF page", len(note["handnote"]["pages"]["sizes"]) == 2
           and note["handnote"]["pages"]["sizes"][0] == {"w": 793, "h": 1123}, str(note["handnote"]["pages"]["sizes"]))
-    check("page images saved next to the notebook", all(a["path"].startswith("Lectures/Week 1 (pages)/") for a in note["handnote"]["pdf"]["assets"]))
+    check("PDF page images go in Handnote/Attachments (not next to the PDF)",
+          all(a["path"].startswith("Handnote/Attachments/Week 1 pages/") for a in note["handnote"]["pdf"]["assets"]),
+          note["handnote"]["pdf"]["assets"][0]["path"])
     imgs = page.evaluate("[...document.querySelectorAll('.hn-sheet-img')].map(i => i.complete && i.naturalWidth > 0)")
     check("PDF pages show as the paper", imgs == [True, True], str(imgs))
     # find the PDF title text on screen ("Lecture slide 1", dark blue) and highlight over it
@@ -683,6 +685,40 @@ with sync_playwright() as p:
     check("#12 tapping the dot saves now", page.locator(".hn-save.is-saved").count() == 1)
     page.screenshot(path=str(OUT / "saved-dot.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 80})
     check("no JavaScript errors (view)", not [e for e in errors if "disk full" not in e], "; ".join(errors[:3]))
+    ctx.close()
+
+    # ---------- one Handnote folder ----------
+    ctx, page, cdp, errors = open_page("?library", ready="window.libraryReady === true")
+    page.wait_for_function("window.libraryReady === true", timeout=30000); page.wait_for_timeout(400)
+    names = page.evaluate("document.querySelector('.hn-lib-grid').textContent")
+    check("library shows the Handnote folder only", "Ideas" in names and "Deree" in names and "Elsewhere" not in names, names[:200])
+    page.click(".hn-lib-btn:has-text('New notebook')"); page.wait_for_timeout(150)
+    page.click(".hn-lib-btn:has-text('Import PDF')"); page.wait_for_timeout(150)
+    check("new notebooks and imported PDFs go in the Handnote folder",
+          page.evaluate("window.created[0]") == "Handnote" and page.evaluate("window.importInto") == "Handnote", str(page.evaluate("[window.created, window.importInto]")))
+    ctx.close()
+
+    ctx, page, cdp, errors = open_page("?tidy", ready="window.tidyReady === true")
+    page.wait_for_function("window.tidyReady === true", timeout=20000)
+    plan = page.evaluate("window.plan")
+    tos = {m["from"]: m["to"] for m in plan["notes"] + plan["pages"] + plan["exports"]}
+    check("tidy-up finds the scattered notebooks, PDF pages and exports",
+          tos.get("Handwritten/Lecture.handnote") == "Handnote/Lecture.handnote"
+          and tos.get("Handwritten/Deree/MIS.handnote") == "Handnote/Deree/MIS.handnote"
+          and tos.get("Quick Notes/Quick note 1.handnote") == "Handnote/Quick Notes/Quick note 1.handnote"
+          and tos.get("Week 1.handnote") == "Handnote/Week 1.handnote"
+          and tos.get("Week 1 (pages)") == "Handnote/Attachments/Week 1 (pages)"
+          and tos.get("Handwritten/Lecture.pdf") == "Handnote/Exports/Lecture.pdf"
+          and tos.get("Week 1 (print).pdf") == "Handnote/Exports/Week 1 (print).pdf", json.dumps(tos))
+    check("tidy-up never moves the PDF a notebook was made from", "Week 1.pdf" not in tos)
+    page.evaluate("runTidy()"); page.wait_for_function("window.paths !== undefined")
+    paths = page.evaluate("window.paths")
+    week1 = page.evaluate("window.week1")
+    check("after tidy-up: everything is inside Handnote", all(p.startswith("Handnote") or p in ("/", "Week 1.pdf", "Notes", "Notes/Diary.md") for p in paths), ", ".join(paths))
+    check("…old empty folders are gone, your own files stay", "Handwritten" not in paths and "Quick Notes" not in paths and "Week 1 (pages)" not in paths and "Notes/Diary.md" in paths and "Week 1.pdf" in paths)
+    check("…the moved notebook still finds its PDF pages", week1["handnote"]["pdf"]["assets"][0]["path"] == "Handnote/Attachments/Week 1 (pages)/page 001.jpg")
+    check("…and running it again finds nothing left", page.evaluate("(p => !p.notes.length && !p.pages.length && !p.exports.length)(window.plan2)"))
+    check("no JavaScript errors (tidy)", not errors, "; ".join(errors[:3]))
     ctx.close()
 
     # ---------- old settings migrate ----------
