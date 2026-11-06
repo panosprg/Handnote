@@ -1,6 +1,7 @@
 import { newElementWith } from "@excalidraw/excalidraw";
 import type { El } from "../core/context";
 import { isInkElement } from "../core/tools";
+import { isTextHighlight } from "../core/categories";
 
 /** How far from its centre line a stroke's ink reaches. */
 const inkReach = (el: El) => (el.type === "line" ? ((el.strokeWidth as number) + 0.5) / 2 + 1 : (el.strokeWidth as number) * 1.5);
@@ -75,6 +76,23 @@ export function eraseAlong(all: El[], a: P, b: P, r: number): { next: El[]; remo
   const next: El[] = [];
 
   for (const el of all) {
+    // A highlight snapped to PDF words is one box: rubbing it removes it.
+    if (!el.isDeleted && !el.locked && isTextHighlight(el)) {
+      const x1 = el.x - r, x2 = el.x + el.width + r, y1 = el.y - r, y2 = el.y + el.height + r;
+      const box = (p: P) => p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2;
+      const edges: [P, P][] = [
+        [{ x: x1, y: y1 }, { x: x2, y: y1 }],
+        [{ x: x2, y: y1 }, { x: x2, y: y2 }],
+        [{ x: x2, y: y2 }, { x: x1, y: y2 }],
+        [{ x: x1, y: y2 }, { x: x1, y: y1 }],
+      ];
+      if (box(a) || box(b) || edges.some(([c, d]) => segmentsIntersect(a, b, c, d))) {
+        next.push(newElementWith(el as never, { isDeleted: true } as never) as unknown as El);
+        removed++;
+        changed = true;
+        continue;
+      }
+    }
     if (el.isDeleted || el.locked || !isInkElement(el) || !el.points || el.points.length < 2) {
       next.push(el);
       continue;

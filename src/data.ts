@@ -24,6 +24,8 @@ export interface HandnoteFile {
     cover?: string;
     /** set when the notebook was made from a PDF */
     pdf?: { source: string; assets: PdfPageAsset[] };
+    /** What features keep in the notebook (e.g. what each highlighter colour means). */
+    meta?: Record<string, unknown>;
     scrollX?: number;
     scrollY?: number;
     zoom?: number;
@@ -85,6 +87,7 @@ export function parseNote(raw: string, fallbackTemplate: Template): HandnoteFile
       pages: h.pages?.sizes?.length ? h.pages : defaultPages(1),
       cover: h.cover,
       pdf: h.pdf,
+      meta: h.meta && typeof h.meta === "object" ? h.meta : undefined,
       scrollX: h.scrollX,
       scrollY: h.scrollY,
       zoom: h.zoom,

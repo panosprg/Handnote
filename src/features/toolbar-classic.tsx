@@ -43,6 +43,7 @@ function allItems(ctx: HandnoteContext): Item[] {
     });
   }
   for (const b of ctx.registry.enabled(ctx.settings).flatMap((f) => f.toolbarButtons ?? [])) {
+    if (b.when && !b.when(ctx)) continue;
     items.push({ key: `btn:${b.id}`, label: b.label, icon: b.icon, active: !!b.active?.(ctx), run: () => b.onClick(ctx) });
   }
   items.push(

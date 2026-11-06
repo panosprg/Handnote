@@ -15,10 +15,14 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import Canvas from "./core/Canvas";
 import type { HandnoteContext, HostActions } from "./core/context";
-import { exportPdf } from "./core/export";
+import { exportLegends, exportPdf, renderPage } from "./core/export";
+import { ANNOTATE_FEATURE, categories, highlightColor, isHighlight, labelFor } from "./core/categories";
+import { buildAnnotatedPdf, isAnnotated } from "./core/pdf-annotate";
+import { unpackText, type PdfWord } from "./core/pdf-text";
+import { pageRects } from "./core/pages";
 import type { PagesInfo } from "./core/pages";
 import { handnoteFolders, type Template } from "./core/settings";
-import { ensureFolder } from "./pdf-import";
+import { buildPdfText, ensureFolder, pdfDataDir } from "./pdf-import";
 import { parseNote, type HandnoteFile } from "./data";
 import type HandnotePlugin from "./main";
 
@@ -58,6 +62,9 @@ export class HandnoteView extends TextFileView {
   private recentWrites: string[] = [];
   private saveTimer: number | null = null;
   private dirty = false;
+  /** Changed since the annotations were last written into the PDF. */
+  private pdfStale = false;
+  private writingPdf: Promise<void> | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: HandnotePlugin) {
     super(leaf);
@@ -151,6 +158,140 @@ export class HandnoteView extends TextFileView {
     return out;
   }
 
+  /* ---------- the PDF a notebook was made from ---------- */
+
+  private pdfInfo() {
+    const pdf = this.note?.handnote.pdf;
+    if (!pdf) return null;
+    const dir = pdfDataDir(pdf.assets);
+    return { source: pdf.source, dir, original: normalizePath(`${dir}/original.pdf`), text: normalizePath(`${dir}/text.json`) };
+  }
+
+  private async readBytes(path: string): Promise<Uint8Array | null> {
+    const f = this.app.vault.getFileByPath(path);
+    return f ? new Uint8Array(await this.app.vault.readBinary(f)) : null;
+  }
+
+  /**
+   * The PDF exactly as it was imported. Kept as "original.pdf" next to the page images
+   * the first time annotations are written into the PDF (so writing again never doubles them).
+   */
+  private async originalPdf(keep = false): Promise<Uint8Array | null> {
+    const info = this.pdfInfo();
+    if (!info) return null;
+    const saved = await this.readBytes(info.original);
+    if (saved) return saved;
+    const source = await this.readBytes(info.source);
+    // Already annotated by Handnote but its clean copy is gone: can't be used as the original.
+    if (!source || (await isAnnotated(source))) return null;
+    if (keep) {
+      const buf = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength) as ArrayBuffer;
+      await this.app.vault.createBinary(info.original, buf);
+    }
+    return source;
+  }
+
+  /** The words on each PDF page (made from the PDF the first time, for older notebooks). */
+  private async loadPageText(): Promise<PdfWord[][] | null> {
+    const info = this.pdfInfo();
+    if (!info) return null;
+    const f = this.app.vault.getFileByPath(info.text);
+    if (f) {
+      const t = unpackText(await this.app.vault.cachedRead(f));
+      if (t) return t.pages;
+    }
+    const original = await this.originalPdf();
+    if (!original) return null;
+    const buf = original.buffer.slice(original.byteOffset, original.byteOffset + original.byteLength) as ArrayBuffer;
+    return (await buildPdfText(this.app, buf, info.dir)).pages;
+  }
+
+  /** Writes the highlights, handwriting and colour key into the PDF the notebook was made from. */
+  async saveIntoPdf(quiet = false) {
+    if (this.writingPdf) return this.writingPdf;
+    const run = async () => {
+      const info = this.pdfInfo();
+      const ctx = this.ctx;
+      if (!info || !ctx) return;
+      const notice = quiet ? null : new Notice("Handnote: writing into the PDF…", 0);
+      try {
+        if (!this.app.vault.getFileByPath(info.source)) throw new Error(`the PDF isn't at ${info.source} any more`);
+        const original = await this.originalPdf(true);
+        if (!original)
+          throw new Error("the clean copy of the original PDF is missing (original.pdf next to the page images), so it can't be rewritten safely");
+        const legend = exportLegends(ctx);
+        const bytes = await buildAnnotatedPdf(ctx, original, {
+          legend: legend.length > 0,
+          renderExtraPage: (r) => renderPage(ctx, r, ctx.pageTemplate(r.index), legend[r.index]),
+        });
+        await this.writePdf(info.source, bytes);
+        this.pdfStale = false;
+        notice?.hide();
+        if (!quiet) new Notice(`Saved into ${info.source}.`);
+      } catch (e) {
+        notice?.hide();
+        console.error("Handnote: couldn't write into the PDF", e);
+        new Notice(`Handnote: couldn't write into the PDF (${(e as Error).message})`, 8000);
+      }
+    };
+    this.writingPdf = run().finally(() => (this.writingPdf = null));
+    return this.writingPdf;
+  }
+
+  /** Every highlight with its text, grouped by what its colour means, in a Markdown note. */
+  private async collectHighlights() {
+    const ctx = this.ctx;
+    const info = this.pdfInfo();
+    if (!ctx || !info || !this.file) return;
+    const list = categories(ctx);
+    const rects = pageRects(ctx.state.pages);
+    const pageOf = (y: number) => rects.findIndex((r) => y >= r.y - 18 && y <= r.y + r.h + 18);
+    const items = ctx
+      .elements()
+      .filter(isHighlight)
+      .map((e) => ({
+        text: String((e.customData as { text?: string } | undefined)?.text ?? "").trim(),
+        color: highlightColor(e),
+        page: pageOf(e.y + e.height / 2),
+        y: e.y,
+        x: e.x,
+      }))
+      .filter((h) => h.text && h.page >= 0)
+      .sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
+    if (!items.length) {
+      new Notice("Handnote: no highlighted text yet. Highlight over the PDF's words with the highlighter.");
+      return;
+    }
+    // Lines of one highlight that run on (same colour, next line) become one quote.
+    const merged: typeof items = [];
+    for (const h of items) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.color === h.color && prev.page === h.page && h.y - prev.y > 0 && h.y - prev.y < 40) {
+        prev.text = prev.text.endsWith("-") ? prev.text.slice(0, -1) + h.text : `${prev.text} ${h.text}`;
+        prev.y = h.y;
+      } else merged.push({ ...h });
+    }
+    const pdfLink = info.source.replace(/\.pdf$/i, "");
+    const groups = [
+      ...list.filter((c) => c.label.trim()).map((c) => ({ title: c.label.trim(), color: c.color })),
+      { title: "Other highlights", color: "" },
+    ];
+    let md = `# Highlights: ${this.file.basename}\n\nFrom [[${info.source}|${this.file.basename}]] (notebook: [[${this.file.path}|${this.file.basename}]]). Made by Handnote: running "Highlights to a note" again replaces this note.\n`;
+    for (const g of groups) {
+      const mine = merged.filter((h) => (g.color ? h.color === g.color : !labelFor(list, h.color)));
+      if (!mine.length) continue;
+      md += `\n## ${g.title}\n\n`;
+      for (const h of mine) md += `> ${h.text}\n> — [[${pdfLink}.pdf#page=${h.page + 1}|p. ${h.page + 1}]]\n\n`;
+    }
+    const dir = this.file.parent && this.file.parent.path !== "/" ? `${this.file.parent.path}/` : "";
+    const path = normalizePath(`${dir}${this.file.basename} highlights.md`);
+    const existing = this.app.vault.getFileByPath(path);
+    if (existing) await this.app.vault.modify(existing, md);
+    else await this.app.vault.create(path, md);
+    new Notice(`Saved ${merged.length} highlight${merged.length === 1 ? "" : "s"} to ${path}.`);
+    await this.app.workspace.getLeaf("tab").openFile(this.app.vault.getFileByPath(path)!);
+  }
+
   /* ---------- saving (and the green/red dot) ---------- */
 
   private setSaveStatus(saveStatus: "saved" | "unsaved" | "saving" | "error", saveError?: string) {
@@ -161,6 +302,7 @@ export class HandnoteView extends TextFileView {
   private markDirty() {
     if (this.readOnly) return;
     this.dirty = true;
+    this.pdfStale = true;
     this.setSaveStatus("unsaved");
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => void this.flush(), 900);
@@ -186,6 +328,7 @@ export class HandnoteView extends TextFileView {
 
   async onUnloadFile(file: TFile) {
     if (this.dirty) await this.flush();
+    if (this.pdfStale && this.ctx && this.writeOnClose()) await this.saveIntoPdf(true);
     await super.onUnloadFile(file);
   }
 
@@ -196,13 +339,22 @@ export class HandnoteView extends TextFileView {
     else await this.app.vault.createBinary(path, buf);
   }
 
+  private writeOnClose() {
+    const ctx = this.ctx;
+    if (!ctx || !ctx.isEnabled(ANNOTATE_FEATURE)) return false;
+    return ctx.featureSettings<{ writeOnClose?: boolean }>(ANNOTATE_FEATURE).writeOnClose !== false;
+  }
+
   private host: HostActions = {
+    isPdf: () => !!this.note?.handnote.pdf,
+    saveIntoPdf: () => this.saveIntoPdf(),
+    collectHighlights: () => this.collectHighlights(),
     saveNow: () => this.flush(),
     print: async (pages?: number[]) => {
       if (!this.ctx || !this.file) return;
       const notice = new Notice("Handnote: getting the pages ready to print…", 0);
       try {
-        const bytes = await exportPdf(this.ctx, pages);
+        const bytes = await exportPdf(this.ctx, pages, await this.originalPdf());
         notice.hide();
         if (!Platform.isMobile) {
           // Desktop: print the PDF straight from a hidden frame.
@@ -257,7 +409,7 @@ export class HandnoteView extends TextFileView {
       if (!this.ctx || !this.file) return;
       const notice = new Notice("Handnote: making the PDF…", 0);
       try {
-        const bytes = await exportPdf(this.ctx);
+        const bytes = await exportPdf(this.ctx, undefined, await this.originalPdf());
         // In Handnote/Exports (never next to the notebook: that could overwrite the PDF it was made from).
         const exportsDir = handnoteFolders(this.plugin.store.get().core).exports;
         await ensureFolder(this.app, exportsDir);
@@ -290,6 +442,14 @@ export class HandnoteView extends TextFileView {
         isDark={isDark}
         host={this.host}
         loadPageImages={() => this.loadPageImages()}
+        loadPageText={() => this.loadPageText()}
+        onMetaChange={(meta) => {
+          if (this.note) this.note = { ...this.note, handnote: { ...this.note.handnote, meta } };
+          // Like the paper: saved straight away.
+          this.dirty = true;
+          this.pdfStale = true;
+          void this.flush();
+        }}
         onReady={(api, ctx) => {
           this.api = api;
           if (ctx) this.ctx = ctx;

@@ -29,12 +29,13 @@ export function fakeApp() {
       data.set(p, d);
       return add(new TFile(p));
     },
-    readBinary: async (f: TFile) => data.get(f.path) as ArrayBuffer,
+    // Like Obsidian: a fresh copy each time (pdf.js takes over the buffer it's given).
+    readBinary: async (f: TFile) => (data.get(f.path) as ArrayBuffer).slice(0),
     modify: async (f: TFile, d: string) => void data.set(f.path, d),
     read: async (f: TFile) => data.get(f.path) as string,
     cachedRead: async (f: TFile) => data.get(f.path) as string,
     adapter: {
-      readBinary: async (p: string) => data.get(p) as ArrayBuffer,
+      readBinary: async (p: string) => (data.get(p) as ArrayBuffer).slice(0),
       getResourcePath: (p: string) => {
         const d = data.get(p);
         return d instanceof ArrayBuffer ? URL.createObjectURL(new Blob([d], { type: "image/jpeg" })) : "";

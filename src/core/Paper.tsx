@@ -76,7 +76,7 @@ export function PagesUi({ ctx }: { ctx: HandnoteContext }) {
       <div ref={layer} className="hn-sheets hn-sheets-ui">
         <button
           className="hn-add-page"
-          style={{ left: w / 2 - 70, top: bottom + 18 }}
+          style={{ left: w / 2 - 70, top: bottom + 44 }}
           onClick={() => ctx.addPage()}
           aria-label="Add page"
         >

@@ -1,7 +1,9 @@
 import "@excalidraw/excalidraw/index.css";
 import "../src/core/styles.css";
 import { createRoot } from "react-dom/client";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { loadPdfJs } from "obsidian";
+import { pageRects } from "../src/core/pages";
 import Canvas from "../src/core/Canvas";
 import { exportPdf } from "../src/core/export";
 import { FeatureRegistry } from "../src/core/registry";
@@ -174,6 +176,55 @@ if (q.has("library")) {
     w.fakeApp = app;
     w.file = file;
     w.fileText = () => app.data.get(file.path);
+    const wait = setInterval(() => {
+      if (view.ctx) {
+        w.ctx = view.ctx;
+        w.api = view.ctx.api;
+        clearInterval(wait);
+      }
+    }, 20);
+  })();
+} else if (q.has("annotate")) {
+  // A real PDF notebook in the real Obsidian view: text layer, search, highlights, write into the PDF.
+  (async () => {
+    const { HandnoteView } = await import("../src/view");
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const p1 = doc.addPage([595, 842]);
+    p1.drawText("Lecture slide 1", { x: 60, y: 760, size: 28, font });
+    p1.drawText("Evidence shows the results are significant.", { x: 60, y: 700, size: 16, font });
+    p1.drawText("A second claim about infor-", { x: 60, y: 660, size: 16, font });
+    p1.drawText("mation systems follows here.", { x: 60, y: 638, size: 16, font });
+    p1.drawText("Unrelated closing sentence.", { x: 60, y: 560, size: 16, font });
+    // A page stored sideways and shown turned (like many scanned slides): its text reads normally on screen.
+    const p2 = doc.addPage([595, 842]);
+    p2.setRotation(degrees(90));
+    p2.drawText("Rotated page words", { x: 100, y: 60, size: 20, font, rotate: degrees(90) });
+    const app = fakeApp();
+    (app as any).workspace = { getLeaf: () => ({ openFile: async (f: any) => (w.openedFile = f.path) }) };
+    await app.vault.createFolder("Lectures");
+    const pdf = await app.vault.createBinary("Lectures/Week 2.pdf", (await doc.save()).buffer as ArrayBuffer);
+    const noteFile = await importPdf(app as never, pdf as never, { folder: "Handnote", attachments: "Handnote/Attachments" });
+    const raw = app.data.get(noteFile.path) as string;
+    const plugin = { app, store: w.store, registry: w.registry };
+    const view = new HandnoteView({ app } as never, plugin as never);
+    (view as any).file = noteFile;
+    view.contentEl.style.cssText = "position:fixed;inset:0";
+    document.getElementById("app")!.appendChild(view.contentEl);
+    view.setViewData(raw, true);
+    w.view = view;
+    w.fakeApp = app;
+    w.pdfjs = await loadPdfJs();
+    w.pageRects = pageRects;
+    w.bytesOf = (path: string) => new Uint8Array(app.data.get(path) as ArrayBuffer);
+    /** Client point at the middle-left / middle-right of a word on a page. */
+    w.wordAt = (page: number, word: string, side: "left" | "right" | "mid" = "mid") => {
+      const r = pageRects(w.ctx.state.pages)[page];
+      const x = w.ctx.state.pageText[page].find((t: any) => t.t === word);
+      if (!x) return null;
+      const sx = side === "left" ? x.x : side === "right" ? x.x + x.w : x.x + x.w / 2;
+      return w.ctx.toClient(r.x + sx, r.y + x.y + x.h / 2);
+    };
     const wait = setInterval(() => {
       if (view.ctx) {
         w.ctx = view.ctx;

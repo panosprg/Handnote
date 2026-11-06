@@ -9,6 +9,7 @@ const ICONS: Record<string, string> = {
   "more-horizontal": "…", move: "✥", star: "★", "pen-tool": "✒", pen: "🖊", pencil: "✏",
   type: "T", scan: "⬚", plus: "+", "file-plus": "⊕", "file-down": "⤓", folder: "📁",
   "notebook-pen": "📓", "folder-plus": "📁+", "file-text": "📄", "list-tree": "☰", ruler: "📏",
+  search: "🔍", "chevron-up": "▲", "chevron-down": "▼", x: "✕", "file-check": "✓", list: "≡", bookmark: "🔖",
   link: "🔗", unlink: "⛓", sigma: "Σ", printer: "⎙", "layout-grid": "▦", "heading-1": "H1", "heading-2": "H2", "heading-3": "H3", heading: "H",
 };
 export function setIcon(el: HTMLElement, name: string) {

@@ -1,0 +1,152 @@
+/* ============ What colours mean (highlighter panel) ============ */
+
+.hn-meanings {
+  margin-top: 4px;
+}
+.hn-meaning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+.hn-meaning.is-active {
+  background: var(--hn-active);
+}
+.hn-root button.hn-meaning-swatch,
+.hn-meaning-swatch {
+  all: unset;
+  flex: none;
+  width: 30px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+.hn-root button.hn-meaning-name {
+  all: unset;
+  flex: 1;
+  font-size: 14px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.hn-muted {
+  color: var(--hn-muted);
+}
+.hn-meaning-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--hn-text);
+}
+.hn-dark .hn-meaning-input {
+  background: rgba(0, 0, 0, 0.25);
+}
+.hn-root button.hn-meaning-x {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  text-align: center;
+  line-height: 28px;
+  font-size: 18px;
+  color: var(--hn-muted);
+  cursor: pointer;
+}
+.hn-meanings .hn-row {
+  margin-top: 8px;
+}
+
+/* ============ Colour key under each page ============ */
+
+.hn-legend {
+  position: absolute;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--hn-muted);
+}
+.hn-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.hn-legend-swatch {
+  width: 16px;
+  height: 11px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15);
+}
+.hn-dark .hn-legend-swatch {
+  filter: invert(93%) hue-rotate(180deg);
+}
+
+/* ============ Search ============ */
+
+.hn-search {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  width: min(460px, calc(100% - 24px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 18px;
+}
+.hn-search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  padding: 8px 6px;
+  border: none;
+  background: transparent;
+  color: var(--hn-text);
+  outline: none;
+  box-shadow: none;
+}
+.hn-search-count {
+  font-size: 12px;
+  color: var(--hn-muted);
+  white-space: nowrap;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.hn-root button.hn-search-btn {
+  all: unset;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.hn-root button.hn-search-btn:active {
+  background: var(--hn-active);
+}
+.hn-root button.hn-search-btn:disabled {
+  opacity: 0.35;
+}
+.hn-search-hit {
+  position: absolute;
+  border-radius: 3px;
+  background: rgba(255, 146, 43, 0.22);
+  box-shadow: 0 0 0 1px rgba(232, 89, 12, 0.55);
+}
+.hn-search-hit.is-current {
+  background: rgba(255, 146, 43, 0.38);
+  box-shadow: 0 0 0 2px #e8590c;
+}

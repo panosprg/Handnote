@@ -9,6 +9,7 @@ import { PenPipeline } from "./pen";
 import { A4, maxWidth, pageAt, type PagesInfo } from "./pages";
 import { CORE_TOOLS, TOOL_GROUPS } from "./tools";
 import type { ToolDef } from "./types";
+import type { PdfWord } from "./pdf-text";
 
 /** Loose element type: features only touch the fields they need. */
 export type El = {
@@ -43,6 +44,10 @@ export interface UiState {
   pages: PagesInfo;
   /** Background image per page (imported PDFs), as data URLs */
   pageImages: (string | undefined)[];
+  /** Words on each page of an imported PDF (null: not a PDF, or not loaded yet) */
+  pageText: PdfWord[][] | null;
+  /** Things features keep in the notebook file (e.g. what each highlighter colour means) */
+  meta: Record<string, unknown>;
   /** Is the notebook saved? (the green/red dot) */
   saveStatus: "saved" | "unsaved" | "saving" | "error";
   saveError?: string;
@@ -62,6 +67,12 @@ export interface HostActions {
   print?(pages?: number[]): Promise<void>;
   /** Save right now (the saved dot). */
   saveNow?(): Promise<void>;
+  /** Notebooks made from a PDF: write the annotations into that PDF. */
+  saveIntoPdf?(): Promise<void>;
+  /** Notebooks made from a PDF: put every highlight, grouped by meaning, into a Markdown note. */
+  collectHighlights?(): Promise<void>;
+  /** Is this notebook made from a PDF (that can be written into)? */
+  isPdf?(): boolean;
 }
 
 export interface CtxEvents extends Record<string, unknown[]> {
@@ -96,10 +107,11 @@ export class HandnoteContext {
     readonly root: HTMLElement,
     readonly store: SettingsStore,
     readonly registry: FeatureRegistry,
-    initial: { template: Template; pages: PagesInfo },
+    initial: { template: Template; pages: PagesInfo; meta?: Record<string, unknown> },
     private onTemplateChange: (t: Template) => void,
     private onPagesChange: (p: PagesInfo) => void,
     readonly host: HostActions,
+    private onMetaChange: (meta: Record<string, unknown>) => void = () => {},
   ) {
     this.state = {
       tool: "ballpoint",
@@ -110,6 +122,8 @@ export class HandnoteContext {
       modal: false,
       pages: initial.pages,
       pageImages: [],
+      pageText: null,
+      meta: initial.meta ?? {},
       saveStatus: "saved",
     };
     this.pen = new PenPipeline(this);
@@ -239,6 +253,17 @@ export class HandnoteContext {
     const target = this.inkTarget();
     if (this.state.tool !== target) this.setTool(target);
     this.store.updateCore({ [target]: { ...this.core[target], color } } as Partial<CoreSettings>);
+  }
+
+  /* ---------- notebook meta ---------- */
+
+  /** Save something in this notebook's file (under the feature's own key). Saved straight away. */
+  setMeta(key: string, value: unknown) {
+    const meta = { ...this.state.meta };
+    if (value === undefined) delete meta[key];
+    else meta[key] = value;
+    this.setState({ meta });
+    this.onMetaChange(meta);
   }
 
   /* ---------- paper ---------- */

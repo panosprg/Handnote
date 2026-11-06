@@ -8,6 +8,14 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.10.0 (6 Nov 2026)
+- PDF annotation: text layer from the PDF (`text.json`, built on first open for older notebooks), highlighter snaps
+  to words, colour meanings per notebook (defaults in the panel), key under each page and on exports, search,
+  write into the PDF (real highlight annotations, ink, key; rotated pages handled; clean `original.pdf` kept),
+  highlights to a Markdown note, export/print of PDF notebooks keep the PDF's real (selectable) pages.
+- Fixed: exports cut off the outer half of every stroke, and a straightened highlight on its own vanished from exports.
+- Precision eraser removes a word highlight it touches.
+
 ### 0.9.0 (28 Oct 2026)
 - Everything in one `Handnote` folder (Quick Notes, Attachments, Exports inside); library shows only that folder;
   one-time "Tidy up" offer moves older files in (links updated, imported PDFs left alone, empty old folders removed).

@@ -142,6 +142,36 @@ export default class HandnotePlugin extends Plugin {
         return true;
       },
     });
+    this.addCommand({
+      id: "save-into-pdf",
+      name: "Save annotations into the PDF",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(HandnoteView);
+        if (!view?.ctx?.host.isPdf?.()) return false;
+        if (!checking) void view.saveIntoPdf();
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "search-pdf",
+      name: "Search the PDF",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(HandnoteView);
+        if (!view?.ctx?.state.pageText) return false;
+        if (!checking) view.ctx.setState({ panel: "search" });
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "highlights-to-note",
+      name: "Put the PDF's highlights into a note",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(HandnoteView);
+        if (!view?.ctx?.host.isPdf?.()) return false;
+        if (!checking) void view.ctx.host.collectHighlights?.();
+        return true;
+      },
+    });
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFolder) {

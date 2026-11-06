@@ -721,6 +721,158 @@ with sync_playwright() as p:
     check("no JavaScript errors (tidy)", not errors, "; ".join(errors[:3]))
     ctx.close()
 
+    # ---------- PDF annotation: text, search, colour meanings, key, write into the PDF ----------
+    ctx, page, cdp, errors = open_page("?annotate", ready="window.ctx && window.ctx.state.pageText && window.ctx.state.pageImages.length === 2")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 40, scrollY: 20}})"); page.wait_for_timeout(250)
+    text = page.evaluate("ctx.state.pageText.map(p => p.map(w => w.t).join(' '))")
+    check("PDF text is read word by word on import", "Evidence shows the results are significant." in text[0] and text[1] == "Rotated page words", str(text))
+    check("…and kept next to the page images", page.evaluate("fakeApp.files.has('Handnote/Attachments/Week 2 pages/text.json')"))
+    ev = page.evaluate("ctx.state.pageText[0].find(w => w.t === 'Evidence')")
+    base = ev["y"] + ev["h"] * 0.85 / 1.1
+    check("word boxes sit where the words are", abs(ev["x"] - 80) < 2 and abs(base - (842 - 700) * 96 / 72) < 3, f"{ev}, baseline {base:.1f}")
+    rw = page.evaluate("ctx.state.pageText[1][0]")
+    check("…also on a page shown turned", abs(rw["x"] - 80) < 2 and abs(rw["y"] + rw["h"] * 0.85 / 1.1 - 100 * 96 / 72) < 3, str(rw))
+
+    # search
+    tool_before = page.evaluate("api.getAppState().activeTool.type")
+    page.click(".hn-toolbar button[aria-label='Search']"); page.wait_for_timeout(250)
+    page.fill(".hn-search-input", "SIGNIFICANT"); page.wait_for_timeout(350)
+    check("search finds words (any case)", page.inner_text(".hn-search-count").strip() == "1 / 1" and page.locator(".hn-search-hit").count() == 1,
+          page.inner_text(".hn-search-count"))
+    check("…typing in search doesn't switch tools", page.evaluate("api.getAppState().activeTool.type") == tool_before)
+    page.fill(".hn-search-input", "information systems"); page.wait_for_timeout(350)
+    check("search finds a word hyphenated over two lines", page.inner_text(".hn-search-count").strip() == "1 / 1" and page.locator(".hn-search-hit").count() == 2)
+    page.screenshot(path=str(OUT / "pdf-search.png"))
+    page.fill(".hn-search-input", "rotated page"); page.wait_for_timeout(450)
+    check("…and goes to the page it's on", page.inner_text(".hn-search-count").strip() == "1 / 1" and page.evaluate("ctx.currentPage()") == 1)
+    page.fill(".hn-search-input", "zebra"); page.wait_for_timeout(300)
+    check("…says when there's nothing", page.inner_text(".hn-search-count").strip() == "No matches")
+    page.keyboard.press("Escape"); page.wait_for_timeout(150)
+    check("Escape closes search", page.locator(".hn-search").count() == 0)
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 40, scrollY: 20}})"); page.wait_for_timeout(200)
+
+    # highlight snapped to words
+    hls = "api.getSceneElements().filter(e => e.customData?.hn === 'hl').map(e => ({type: e.type, text: e.customData.text, color: e.type === 'rectangle' ? e.backgroundColor : e.strokeColor}))"
+    tap(page, "Highlighter")
+    a = page.evaluate("wordAt(0, 'Evidence', 'left')"); b = page.evaluate("wordAt(0, 'significant.', 'right')")
+    pen_stroke(cdp, wobbly(a["x"] - 6, b["x"] + 6, a["y"], 50, 2.5), page, settle=300)
+    hl = page.evaluate(hls)
+    check("highlighting over PDF text snaps to the words and keeps the text",
+          len(hl) == 1 and hl[0]["type"] == "rectangle" and hl[0]["text"] == "Evidence shows the results are significant.", str(hl))
+    check("…the key under the page shows what the colour means", page.locator(".hn-legend").count() == 1 and "Evidence" in page.inner_text(".hn-legend"))
+    undo(page)
+    check("…one undo removes the highlight (and the key)", len(page.evaluate(hls)) == 0 and page.locator(".hn-legend").count() == 0)
+    tap(page, "Redo"); page.wait_for_timeout(150)
+    check("…redo brings it back", len(page.evaluate(hls)) == 1)
+
+    page.evaluate("ctx.setInkColor('#b2f2bb')")
+    a = page.evaluate("wordAt(0, 'A', 'left')"); b = page.evaluate("wordAt(0, 'infor-', 'right')")
+    pen_stroke(cdp, line(a["x"] - 4, a["y"], b["x"] + 4, a["y"] + 2, 40), page, settle=300)
+    page.evaluate("ctx.setInkColor('#ffc9c9')")
+    a = page.evaluate("wordAt(0, 'Unrelated', 'left')"); b = page.evaluate("wordAt(0, 'sentence.', 'right')")
+    pen_stroke(cdp, line(a["x"] - 4, a["y"], b["x"] + 4, a["y"], 40), page, settle=300)
+    legend = page.inner_text(".hn-legend")
+    check("…each colour used on the page is in its key (named ones only)", "Evidence" in legend and "Key idea" in legend and "Unrelated" not in legend, legend)
+    pen_stroke(cdp, line(140, 700, 400, 700, 30), page, settle=300)  # empty space low on page 1: no words
+    check("a highlight away from the text stays a normal stroke", page.evaluate(hls)[-1]["type"] == "freedraw")
+
+    # name the new colour in the highlighter's panel
+    tap(page, "Highlighter"); page.wait_for_timeout(200)
+    check("the highlighter panel has 'What colours mean'", page.locator(".hn-meanings").count() == 1)
+    page.fill(".hn-meaning-input", "Counter-argument"); page.keyboard.press("Enter"); page.wait_for_timeout(300)
+    page.screenshot(path=str(OUT / "pdf-meanings.png"))
+    legend = page.inner_text(".hn-legend")
+    check("naming a colour adds it to the key straight away", "Counter-argument" in legend, legend)
+    saved = page.evaluate("JSON.parse(fakeApp.data.get(view.file.path)).handnote.meta.highlightCategories")
+    check("…and the meanings are saved in the notebook", any(c["label"] == "Counter-argument" and c["color"] == "#ffc9c9" for c in saved), str(saved))
+    page.evaluate("ctx.setState({panel: null})"); page.wait_for_timeout(100)
+    page.screenshot(path=str(OUT / "pdf-legend.png"))
+
+    # highlight on the turned page
+    page.evaluate("ctx.scrollTo(ctx.state.pages.sizes[0].w / 2, pageRects(ctx.state.pages)[1].y + 60)"); page.wait_for_timeout(250)
+    page.evaluate("ctx.setInkColor('#ffe066')")
+    a = page.evaluate("wordAt(1, 'Rotated', 'left')"); b = page.evaluate("wordAt(1, 'words', 'right')")
+    pen_stroke(cdp, line(a["x"] - 4, a["y"], b["x"] + 4, a["y"], 40), page, settle=300)
+    check("highlights snap to words on a turned page too", page.evaluate(hls)[-1].get("text") == "Rotated page words", str(page.evaluate(hls)[-1]))
+
+    # write into the PDF
+    page.evaluate("view.saveIntoPdf()")
+    check("writing into the PDF keeps a clean copy of the original",
+          page.evaluate("fakeApp.files.has('Handnote/Attachments/Week 2 pages/original.pdf')"))
+    read_pdf = """(async path => {
+        const doc = await pdfjs.getDocument({data: bytesOf(path).slice()}).promise;
+        const out = [];
+        for (let n = 1; n <= doc.numPages; n++) {
+          const p = await doc.getPage(n);
+          const annots = (await p.getAnnotations()).filter(a => a.subtype === 'Highlight')
+            .map(a => ({text: a.contentsObj?.str, rect: a.rect, color: Array.from(a.color || [])}));
+          const t = await p.getTextContent();
+          const ops = await p.getOperatorList();
+          const imgs = ops.fnArray.filter(f => f === pdfjs.OPS.paintImageXObject).length;
+          out.push({view: p.view, rotate: p.rotate, annots, imgs, text: t.items.map(i => i.str).join(' ')});
+        }
+        return out;
+    })"""
+    pdf = page.evaluate(read_pdf + "('Lectures/Week 2.pdf')")
+    p1 = pdf[0]
+    texts = [a_["text"] for a_ in p1["annots"]]
+    check("the PDF gets real highlight annotations, named by meaning",
+          "Evidence: Evidence shows the results are significant." in texts and "Key idea: A second claim about infor-" in texts
+          and "Counter-argument: Unrelated closing sentence." in texts, str(texts))
+    ev_rect = next(a_["rect"] for a_ in p1["annots"] if a_["text"].startswith("Evidence:"))
+    check("…sitting on the words they highlight", ev_rect[0] < 62 and abs(ev_rect[0] - 60) < 3 and ev_rect[1] < 700 < ev_rect[3] and ev_rect[3] - ev_rect[1] < 24, str(ev_rect))
+    check("…the PDF's own text is kept (still selectable and searchable)", "Evidence shows the results are significant." in p1["text"])
+    check("…the page grows at the bottom for the colour key", abs(p1["view"][1] + 22.5) < 0.6 and abs(p1["view"][3] - 842) < 0.1, str(p1["view"]))
+    check("…a freehand highlight (perfectly straight) is drawn too, not dropped", p1["imgs"] == 2, f"{p1['imgs']} images (ink + key expected)")
+    p2 = pdf[1]
+    r2 = p2["annots"][0]["rect"] if p2["annots"] else None
+    check("on a turned page the highlight lands on its words", p2["rotate"] == 90 and r2 and r2[0] < 100 < r2[2] and abs(r2[1] - 60) < 4 and r2[3] > 150, f"{p2['rotate']} {r2}")
+    check("…and its key goes on the edge shown at the bottom", abs(p2["view"][2] - (595 + 22.5)) < 0.6, str(p2["view"]))
+    page.evaluate("view.saveIntoPdf()")
+    again = page.evaluate(read_pdf + "('Lectures/Week 2.pdf')")
+    check("writing again doesn't double anything", [len(x["annots"]) for x in again] == [len(x["annots"]) for x in pdf] and again[0]["view"] == p1["view"],
+          f"{[len(x['annots']) for x in again]} {again[0]['view']}")
+    (OUT / "written.pdf").write_bytes(bytes(page.evaluate("Array.from(bytesOf('Lectures/Week 2.pdf'))")))
+    orig = page.evaluate(read_pdf + "('Handnote/Attachments/Week 2 pages/original.pdf')")
+    check("…the clean copy stays clean", all(not x["annots"] for x in orig) and orig[0]["view"] == [0, 0, 595, 842])
+
+    # highlights → note
+    page.evaluate("ctx.host.collectHighlights()")
+    md = page.evaluate("fakeApp.data.get('Handnote/Week 2 highlights.md')") or ""
+    check("highlights go into a note, grouped by meaning, with page links",
+          "## Evidence" in md and "> Evidence shows the results are significant." in md and "## Counter-argument" in md
+          and "[[Lectures/Week 2.pdf#page=1|p. 1]]" in md and md.index("## Evidence") < md.index("## Key idea"), md[:400])
+
+    # export keeps the PDF's pages too
+    page.evaluate("ctx.host.exportPdf()")
+    exp = page.evaluate(read_pdf + "('Handnote/Exports/Week 2.pdf')")
+    check("export of a PDF notebook keeps the real PDF pages and highlights", "significant" in exp[0]["text"] and len(exp[0]["annots"]) == 3)
+
+    # precision eraser rubs out a word highlight; closing the notebook updates the PDF
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 40, scrollY: 20}})"); page.wait_for_timeout(200)
+    tap(page, "Precision eraser")
+    a = page.evaluate("wordAt(0, 'Unrelated', 'mid')")
+    pen_stroke(cdp, line(a["x"] - 2, a["y"] - 6, a["x"] + 2, a["y"] + 6, 8), page, settle=300)
+    check("the precision eraser rubs out a word highlight", not any(h.get("text") == "Unrelated closing sentence." for h in page.evaluate(hls)))
+    page.evaluate("view.onUnloadFile(view.file)"); page.wait_for_timeout(300)
+    closed = page.evaluate(read_pdf + "('Lectures/Week 2.pdf')")
+    check("closing the notebook updates the PDF", len(closed[0]["annots"]) == 2, str([a_["text"] for a_ in closed[0]["annots"]]))
+    check("no JavaScript errors (PDF annotation)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # colour key on a plain notebook's export
+    ctx, page, cdp, errors = open_page()
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})"); page.wait_for_timeout(150)
+    tap(page, "Highlighter")
+    pen_stroke(cdp, line(200, 300, 500, 300, 30), page, settle=250)
+    check("plain notebooks get the key too", "Evidence" in page.inner_text(".hn-legend"))
+    page.evaluate("ctx.host.exportPdf()")
+    page.wait_for_function("window.exportedPdf !== undefined", timeout=20000)
+    h = page.evaluate("(async () => (await PDFDocument.load(window.exportedPdf)).getPage(0).getHeight())()")
+    check("…and exported pages get it underneath", abs(h - (1123 + 30) * 0.75) < 1, str(h))
+    check("no JavaScript errors (key export)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
     # ---------- old settings migrate ----------
     v1 = {"notesFolder": "Hand", "pen": {"color": "#e03131", "width": 1.5, "opacity": 100, "stabilization": 70},
           "highlighter": {"color": "#b2f2bb", "width": 6, "opacity": 40, "stabilization": 50},

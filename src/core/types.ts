@@ -45,6 +45,8 @@ export interface ToolbarButton {
   icon: string;
   onClick(ctx: HandnoteContext): void;
   active?(ctx: HandnoteContext): boolean;
+  /** Only show the button when this is true (e.g. only in notebooks made from a PDF). */
+  when?(ctx: HandnoteContext): boolean;
 }
 
 /** An action shown in the bar that appears over a selection. */

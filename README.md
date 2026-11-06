@@ -20,6 +20,14 @@ Handwritten notes for Obsidian, made for iPad + Apple Pencil, built on the Excal
 - **Writing help:** shape-preserving stabilization, hold-to-snap shapes, ruler, Pencil-tip indicator.
 - **Selecting:** lasso and rectangle, one clean outline; selection bar with headings, links and Solve.
 - **Headings + outline**, **links to notes**, **maths solving** (the last two kinds of recognition need MyScript keys).
+- **PDFs:** "Write on a PDF" makes a notebook from it. The highlighter snaps to the PDF's words; give each highlighter
+  colour a meaning (yellow = Evidence…) in the highlighter's panel under *What colours mean*, and a key under each
+  page shows the meanings used on it. **Search** (magnifier in the top bar) finds text, also across hyphenated
+  line breaks and without caring about accents. Notebook → **Save into the PDF** writes your highlights (as real PDF
+  highlights, commented "Evidence: …"), handwriting and the key into the PDF itself; it also happens when you close the
+  notebook (setting). A clean copy of the original is kept as `original.pdf` next to the page images, so writing again
+  never doubles anything: don't delete it. Notebook → **Highlights to a note** collects every highlight, grouped by
+  meaning, with links to its page.
 - **Gestures:** one finger scrolls, pinch zooms, two/three-finger tap = undo/redo, swipe up past the last page to add one,
   finger hold or Pencil press-and-hold opens the quick dial.
 - If a feature breaks, a message says which one and why (instead of it silently disappearing).

@@ -441,6 +441,35 @@ export function PanelHost({
             <Icon name="layout-grid" /> Edit toolbar
           </button>
         </div>
+        {ctx.host.isPdf?.() && (
+          <>
+            <div className="hn-label">PDF</div>
+            <div className="hn-row">
+              {ctx.host.saveIntoPdf && (
+                <button
+                  className="hn-chip"
+                  onClick={() => {
+                    ctx.setState({ panel: null });
+                    void ctx.host.saveIntoPdf!();
+                  }}
+                >
+                  <Icon name="file-check" /> Save into the PDF
+                </button>
+              )}
+              {ctx.host.collectHighlights && (
+                <button
+                  className="hn-chip"
+                  onClick={() => {
+                    ctx.setState({ panel: null });
+                    void ctx.host.collectHighlights!();
+                  }}
+                >
+                  <Icon name="list" /> Highlights to a note
+                </button>
+              )}
+            </div>
+          </>
+        )}
         {ctx.host.print && <PrintRow ctx={ctx} />}
       </>
     );

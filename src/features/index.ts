@@ -16,6 +16,7 @@ import recognition from "./recognition";
 import ruler from "./ruler";
 import highlighterBehind from "./highlighter-behind";
 import lasso from "./lasso";
+import pdfAnnotate from "./pdf-annotate";
 import radialMenu from "./radial-menu";
 import scribbleDelete from "./scribble-delete";
 import shapeSnap from "./shape-snap";
@@ -29,6 +30,7 @@ export const BUILT_IN_FEATURES: HandnoteFeature<any>[] = [
   stabilizer,
   shapeSnap,
   highlighterBehind,
+  pdfAnnotate,
   scribbleDelete,
   eraseEffect,
   cleanSelection,

@@ -19,6 +19,9 @@ export interface CanvasProps {
   isDark: boolean;
   /** Background images for the pages (imported PDFs), loaded after the note opens. */
   loadPageImages?: () => Promise<(string | undefined)[]>;
+  /** Words on each PDF page (imported PDFs), loaded after the note opens. */
+  loadPageText?: () => Promise<import("./pdf-text").PdfWord[][] | null>;
+  onMetaChange?(meta: Record<string, unknown>): void;
   host: HostActions;
   onReady(api: ExcalidrawImperativeAPI, ctx: HandnoteContext | null): void;
   onDirty(): void;
@@ -31,7 +34,8 @@ export interface CanvasProps {
  * Features never need this file changed; they talk to HandnoteContext.
  */
 export default function Canvas(props: CanvasProps) {
-  const { initial, store, registry, isDark, onReady, onDirty, onTemplateChange, onPagesChange, host, loadPageImages } = props;
+  const { initial, store, registry, isDark, onReady, onDirty, onTemplateChange, onPagesChange, host, loadPageImages, loadPageText, onMetaChange } =
+    props;
   const settings = useSettings(store);
   useSyncExternalStore(
     (l) => registry.events.on("changed", l),
@@ -53,14 +57,18 @@ export default function Canvas(props: CanvasProps) {
       rootRef.current,
       store,
       registry,
-      { template: initial.handnote.template, pages: initial.handnote.pages },
+      { template: initial.handnote.template, pages: initial.handnote.pages, meta: initial.handnote.meta },
       onTemplateChange,
       onPagesChange,
       host,
+      (m) => onMetaChange?.(m),
     );
     setCtx(c);
     onReady(api, c);
     loadPageImages?.().then((imgs) => c.setState({ pageImages: imgs }));
+    loadPageText?.()
+      .then((t) => t && c.setState({ pageText: t }))
+      .catch((e) => console.warn("Handnote: no PDF text", e));
     const offBallpoint = c.pen.addFilter(BALLPOINT_FILTER);
     const offHighlighter = c.pen.addFilter(HIGHLIGHTER_FILTER);
     const offDash = c.pen.addFilter(DASH_FILTER);
