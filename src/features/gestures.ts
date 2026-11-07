@@ -1,4 +1,3 @@
-import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { totalHeight } from "../core/pages";
 import { defineFeature } from "../core/types";
 import "./gestures.css";
@@ -36,8 +35,10 @@ export default defineFeature<S>({
   setup(ctx, s) {
     type T = { sx: number; sy: number; x: number; y: number; t: number };
     const touches = new Map<number, T>();
+    /** Touches we decided to ignore (palm, or put down while the Pencil was in use) until they lift. */
+    const ignored = new Set<number>();
     let panning = false;
-    let tap: { start: number; count: number; moved: boolean } | null = null;
+    let tap: { start: number; count: number; moved: boolean; lastDown: number } | null = null;
     let pinch: { dist: number; zoom: number; cx: number; cy: number } | null = null;
 
     // Tools where fingers only navigate. (Select and text keep fingers for themselves.)
@@ -60,7 +61,18 @@ export default defineFeature<S>({
 
     const startPinch = () => {
       const c = centre();
-      pinch = { dist: Math.max(1, c.d), zoom: ctx.api.getAppState().zoom.value, cx: c.x, cy: c.y };
+      pinch = { dist: Math.max(1, c.d), zoom: ctx.view().zoom, cx: c.x, cy: c.y };
+    };
+
+    /** The Pencil came down: whatever the fingers (or palm) were doing is cancelled, never finished. */
+    const cancelAll = () => {
+      for (const id of touches.keys()) ignored.add(id);
+      touches.clear();
+      tap = null;
+      pinch = null;
+      if (panning) ctx.endViewMove();
+      panning = false;
+      hidePull();
     };
 
     // Swipe-up-to-add-page hint, shown in the empty space under the last page.
@@ -92,21 +104,28 @@ export default defineFeature<S>({
       pullArmed = false;
     };
 
-    const view = (zoom: number, scrollX: number, scrollY: number) =>
-      ctx.api.updateScene({
-        appState: { zoom: { value: zoom as never }, scrollX, scrollY },
-        captureUpdate: CaptureUpdateAction.NEVER,
-      });
+    // While a finger moves the page, a snapshot moves (smooth); the real redraw happens when it stops.
+    const view = (zoom: number, scrollX: number, scrollY: number) => ctx.setView({ zoom, scrollX, scrollY }, true);
 
     /** Window capture: runs first, does the work. */
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "touch" || !ctx.root.contains(e.target as Node)) return;
       if ((e.target as HTMLElement).tagName !== "CANVAS" || ctx.claimedTouches.has(e.pointerId)) return;
+      // Palm rejection: a hand resting on the screen while writing does nothing at all.
+      if (ctx.isPalm(e)) {
+        ignored.add(e.pointerId);
+        return;
+      }
       touches.set(e.pointerId, { sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, t: e.timeStamp });
-      panning = false;
-      if (touches.size === 1) tap = { start: e.timeStamp, count: 1, moved: false };
-      else if (tap && e.timeStamp - tap.start < 250) tap.count = touches.size;
-      else tap = null;
+      if (touches.size === 1) {
+        if (panning) ctx.endViewMove();
+        panning = false;
+        tap = { start: e.timeStamp, count: 1, moved: false, lastDown: e.timeStamp };
+      } else if (tap && !tap.moved && e.timeStamp - tap.lastDown < 200) {
+        // All fingers of a tap land together.
+        tap.count = touches.size;
+        tap.lastDown = e.timeStamp;
+      } else tap = null;
       if (touches.size >= 2) startPinch();
     };
 
@@ -120,14 +139,15 @@ export default defineFeature<S>({
       if (Math.hypot(t.x - t.sx, t.y - t.sy) > MOVE_TOLERANCE && tap) tap.moved = true;
       if (ctx.state.modal || !owns()) return;
 
-      const st = ctx.api.getAppState();
+      const st = ctx.view();
       if (touches.size >= 2 && pinch) {
         const c = centre();
+        panning = true;
         // Zoom out only until the page fills the screen width (like Goodnotes).
         const z1 = Math.min(MAX_ZOOM, Math.max(ctx.minZoom(), pinch.zoom * (c.d / pinch.dist)));
         // The scene point that was under the fingers stays under the fingers (zoom + move together).
-        const anchorX = pinch.cx / st.zoom.value - st.scrollX;
-        const anchorY = pinch.cy / st.zoom.value - st.scrollY;
+        const anchorX = pinch.cx / st.zoom - st.scrollX;
+        const anchorY = pinch.cy / st.zoom - st.scrollY;
         pinch.cx = c.x;
         pinch.cy = c.y;
         view(z1, c.x / z1 - anchorX, c.y / z1 - anchorY);
@@ -136,19 +156,35 @@ export default defineFeature<S>({
       if (touches.size === 1 && s().oneFingerScroll) {
         if (panning || Math.hypot(t.x - t.sx, t.y - t.sy) > MOVE_TOLERANCE) {
           panning = true;
-          view(st.zoom.value, st.scrollX + dx / st.zoom.value, st.scrollY + dy / st.zoom.value);
+          view(st.zoom, st.scrollX + dx / st.zoom, st.scrollY + dy / st.zoom);
           showPull();
         }
       }
     };
 
     const onUp = (e: PointerEvent) => {
+      if (ignored.delete(e.pointerId)) return;
       if (!touches.has(e.pointerId)) return;
-      if (tap && !tap.moved && e.timeStamp - tap.start < 350 && touches.size === tap.count) {
-        if (tap.count === 2 && s().twoFingerUndo) ctx.undo();
-        if (tap.count === 3 && s().threeFingerRedo) ctx.redo();
-        tap = null;
+      // Only a real lift counts as a tap: iPadOS cancels touches (palm, system gestures) and
+      // a cancelled touch must never undo anything.
+      const realTap =
+        e.type === "pointerup" &&
+        tap &&
+        !tap.moved &&
+        e.timeStamp - tap.start < 300 &&
+        touches.size === tap.count &&
+        !ctx.penBusy(1500);
+      if (realTap && tap) {
+        if (tap.count === 2 && s().twoFingerUndo) {
+          ctx.undo();
+          ctx.toast("Undo", { label: "Redo", run: () => ctx.redo() });
+        }
+        if (tap.count === 3 && s().threeFingerRedo) {
+          ctx.redo();
+          ctx.toast("Redo", { label: "Undo", run: () => ctx.undo() });
+        }
       }
+      if (tap && touches.size === tap.count) tap = null;
       touches.delete(e.pointerId);
       if (touches.size >= 2) startPinch();
       else pinch = null;
@@ -159,6 +195,7 @@ export default defineFeature<S>({
           setTimeout(() => hint.classList.remove("is-added"), 600);
         }
         hidePull();
+        if (panning) ctx.endViewMove();
         panning = false;
         tap = null;
       }
@@ -166,7 +203,11 @@ export default defineFeature<S>({
 
     /** Root capture: keeps Excalidraw from also reacting to the same fingers. */
     const block = (e: PointerEvent) => {
-      if (e.pointerType === "touch" && (owns() || ctx.claimedTouches.has(e.pointerId)) && (e.target as HTMLElement)?.tagName === "CANVAS")
+      if (
+        e.pointerType === "touch" &&
+        (owns() || ctx.claimedTouches.has(e.pointerId) || ignored.has(e.pointerId)) &&
+        (e.target as HTMLElement)?.tagName === "CANVAS"
+      )
         e.stopPropagation();
     };
     // Excalidraw cancels the browser's touch handling on iPad (that's what stops iPadOS
@@ -178,6 +219,7 @@ export default defineFeature<S>({
       if (e.cancelable && (e.target as HTMLElement)?.tagName === "CANVAS") e.preventDefault();
     };
 
+    const offPen = ctx.events.on("penDown" as never, cancelAll as never);
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerup", onUp, true);
@@ -187,6 +229,7 @@ export default defineFeature<S>({
     ctx.root.addEventListener("touchstart", blockTouch, opts);
     ctx.root.addEventListener("touchmove", blockTouch, opts);
     return () => {
+      offPen();
       hint.remove();
       window.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove, true);

@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import builtins from "builtin-modules";
 import fs from "fs";
+import { excalidrawPatch } from "./scripts/excalidraw-patch.mjs";
 
 const prod = process.argv[2] === "production";
 
@@ -37,7 +38,7 @@ await esbuild.build({
   loader: { ".woff2": "dataurl", ".ttf": "dataurl" },
   minify: prod,
   sourcemap: prod ? false : "inline",
-  plugins: [slim],
+  plugins: [slim, excalidrawPatch],
   logLevel: "info",
   legalComments: "none",
 });

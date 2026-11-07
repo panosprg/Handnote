@@ -34,8 +34,22 @@ def pen_stroke(cdp, pts, page, delay=8, settle=150, forces=None):
 def hover(cdp, x, y):
     cdp.send("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y, "button": "none", "buttons": 0, "pointerType": "pen"})
 
-def touch(cdp, kind, points):
-    cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [{"x": x, "y": y, "id": i} for i, (x, y) in points]})
+def touch(cdp, kind, points, page=None, radius=None, fresh=True):
+    # A finger put down well after the Pencil was used (palm rejection ignores touches right after writing).
+    if kind == "touchStart" and CURRENT_PAGE.get("page") is not None and fresh:
+        try:
+            CURRENT_PAGE["page"].evaluate("window.ctx && (ctx.lastPenAt = -Infinity, ctx.penDown = false)")
+        except Exception:
+            pass
+    pts = []
+    for i, (x, y) in points:
+        tp = {"x": x, "y": y, "id": i}
+        if radius:
+            tp.update({"radiusX": radius, "radiusY": radius})
+        pts.append(tp)
+    cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": pts})
+
+CURRENT_PAGE = {}
 
 def line(x0, y0, x1, y1, n=40):
     return [(x0 + (x1 - x0) * i / (n - 1), y0 + (y1 - y0) * i / (n - 1)) for i in range(n)]
@@ -84,6 +98,7 @@ with sync_playwright() as p:
         page.goto(URL + query)
         page.wait_for_function(ready, timeout=30000)
         page.wait_for_timeout(700)
+        CURRENT_PAGE["page"] = page
         # Most checks draw at 100% zoom; the zoom-out limit (page fills the width) has its own test.
         if free_zoom:
             page.evaluate("window.ctx && (ctx.minZoom = () => 0.25)")
@@ -685,6 +700,143 @@ with sync_playwright() as p:
     check("#12 tapping the dot saves now", page.locator(".hn-save.is-saved").count() == 1)
     page.screenshot(path=str(OUT / "saved-dot.png"), clip={"x": 0, "y": 0, "width": 1180, "height": 80})
     check("no JavaScript errors (view)", not [e for e in errors if "disk full" not in e], "; ".join(errors[:3]))
+    ctx.close()
+
+    # ================= 0.10: deleted words, palm, scrolling, highlights, menus =================
+    ctx, page, cdp, errors = open_page()
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 0, scrollY: 0}})"); page.wait_for_timeout(150)
+    def n_ink(): return page.evaluate("api.getSceneElements().filter(e => !e.isDeleted && e.type === 'freedraw').length")
+    def sy(): return page.evaluate("api.getAppState().scrollY")
+    tap(page, "Ballpoint")
+    for k in range(3):
+        pen_stroke(cdp, [(300 + k * 70 + i * 2, 300 + 10 * math.sin(i / 3)) for i in range(25)], page)
+    n0 = n_ink()
+
+    # palm rejection
+    y0 = sy()
+    page.evaluate("ctx.lastPenAt = performance.now()")
+    touch(cdp, "touchStart", [(0, (700, 600))], fresh=False)
+    for k in range(1, 15): touch(cdp, "touchMove", [(0, (700, 600 - k * 15))])
+    touch(cdp, "touchEnd", []); page.wait_for_timeout(250)
+    check("palm: a hand on the screen right after writing doesn't scroll", abs(sy() - y0) < 1, f"{sy()} vs {y0}")
+    page.evaluate("ctx.lastPenAt = -Infinity")
+    touch(cdp, "touchStart", [(0, (700, 600))], radius=40)
+    for k in range(1, 15): touch(cdp, "touchMove", [(0, (700, 600 - k * 15))], radius=40)
+    touch(cdp, "touchEnd", [], radius=40); page.wait_for_timeout(250)
+    check("palm: a big contact (palm) doesn't scroll", abs(sy() - y0) < 1, f"{sy()} vs {y0}")
+    touch(cdp, "touchStart", [(0, (600, 600)), (1, (700, 600))]); page.wait_for_timeout(60)
+    touch(cdp, "touchCancel", []); page.wait_for_timeout(200)
+    check("a two-finger touch iPadOS cancels never undoes", n_ink() == n0, f"{n_ink()} vs {n0}")
+    touch(cdp, "touchStart", [(0, (600, 600)), (1, (700, 600))]); page.wait_for_timeout(40)
+    pen_stroke(cdp, line(300, 420, 400, 425, 12), page, settle=40)
+    touch(cdp, "touchEnd", [(1, (700, 600))], fresh=False); touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(200)
+    check("the Pencil coming down cancels a two-finger tap (no undo)", n_ink() == n0 + 1, f"{n_ink()} vs {n0 + 1}")
+    page.wait_for_timeout(1600)
+    touch(cdp, "touchStart", [(0, (600, 600)), (1, (700, 600))]); page.wait_for_timeout(60)
+    touch(cdp, "touchEnd", [(1, (700, 600))], fresh=False); touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(250)
+    toast = page.evaluate("document.querySelector('.hn-toast')?.textContent || ''")
+    check("a real two-finger tap still undoes, and says so (with Redo)", n_ink() == n0 and "Undo" in toast and "Redo" in toast, toast)
+    page.click(".hn-toast-btn"); page.wait_for_timeout(200)
+    check("…Redo in the message brings it back", n_ink() == n0 + 1)
+
+    # dial: never from a palm, never picks on a cancelled touch
+    touch(cdp, "touchStart", [(0, (800, 650))], radius=40); page.wait_for_timeout(800)
+    check("a resting palm doesn't open the dial", page.locator(".hn-dial").count() == 0)
+    touch(cdp, "touchEnd", [], radius=40); page.wait_for_timeout(100)
+    before_tool = page.evaluate("ctx.state.tool")
+    touch(cdp, "touchStart", [(0, (800, 650))]); page.wait_for_timeout(800)
+    opened = page.locator(".hn-dial").count() == 1
+    touch(cdp, "touchMove", [(0, (800, 590))], fresh=False); page.wait_for_timeout(120)
+    touch(cdp, "touchCancel", [], fresh=False); page.wait_for_timeout(150)
+    check("a cancelled touch on the dial doesn't switch tools", opened and page.evaluate("ctx.state.tool") == before_tool, page.evaluate("ctx.state.tool"))
+    page.keyboard.press("Escape")
+    if page.locator(".hn-dial-backdrop").count(): page.mouse.click(30, 780); page.wait_for_timeout(150)
+
+    # scribble-to-delete: never on ordinary writing
+    tap(page, "Ballpoint")
+    pen_stroke(cdp, line(462, 528, 463, 529, 3), page)  # an i-dot
+    dot_id = page.evaluate("api.getSceneElements().filter(e => !e.isDeleted).slice(-1)[0].id")
+    word = [(420 + i * 1.1, 545 - abs(math.sin(i / 6)) * 18) for i in range(90)]  # joined-up "mmmm" around the dot
+    pen_stroke(cdp, word, page); page.wait_for_timeout(200)
+    alive = page.evaluate(f"api.getSceneElements().some(e => e.id === '{dot_id}' && !e.isDeleted)")
+    check("writing a joined-up word next to an i-dot deletes nothing", alive and page.locator(".hn-toast:has-text('Scribbled')").count() == 0)
+    for k in range(3):
+        pen_stroke(cdp, [(300 + k * 40 + i * 1.5, 700 + 8 * math.sin(i / 2)) for i in range(20)], page)
+    before = n_ink()
+    zig = []
+    for k in range(8):
+        zig += [(295 + j * 4, 690 + (k % 2) * 24 + (j % 2) * 0) for j in range(1)]
+        zig += [(295 + 50 * (k % 2) + (0 if k % 2 else 0), 690)]
+    zig = [(290 + (k % 2) * 140, 688 + k * 2.5) for k in range(14)]
+    dense = []
+    for a, b in zip(zig, zig[1:]):
+        dense += [(a[0] + (b[0] - a[0]) * t / 10, a[1] + (b[1] - a[1]) * t / 10) for t in range(10)]
+    pen_stroke(cdp, dense, page, delay=2); page.wait_for_timeout(250)
+    check("a real scribble over words still deletes them, and says so (with Undo)", n_ink() <= before - 3 and page.locator(".hn-toast:has-text('Scribbled out')").count() == 1, f"{n_ink()} vs {before}")
+    page.click(".hn-toast-btn"); page.wait_for_timeout(250)
+    check("…Undo in the message brings the words back and removes the scribble", n_ink() == before, f"{n_ink()} vs {before}")
+
+    # highlights are drawn under the ink
+    tap(page, "Highlighter")
+    pen_stroke(cdp, [(280 + i * 8, 1000 - 700) for i in range(40)], page)
+    page.wait_for_timeout(250)
+    hl = page.evaluate("""(() => {
+        const root = document.querySelector('.hn-root');
+        const px = (sel, x, y) => { const c = document.querySelector(sel); const d = window.devicePixelRatio;
+          return [...c.getContext('2d').getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data]; };
+        return { on: root.classList.contains('hn-under-on'), under: px('canvas.hn-under', 600, 300), stat: px('canvas.excalidraw__canvas.static', 600, 300) };
+    })()""")
+    check("highlights are drawn under the ink (never over text), not by Excalidraw on screen",
+          hl["on"] and hl["under"][3] > 0 and hl["stat"][3] == 0, json.dumps(hl))
+    tap(page, "Ballpoint")
+
+    # menus: close when you tap the page; never off the screen
+    page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(150)
+    touch(cdp, "touchStart", [(0, (1050, 700))]); touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(200)
+    check("tapping the page with a finger closes the colour menu", page.locator(".hn-panel").count() == 0)
+    page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(150)
+    n1 = n_ink()
+    pen_stroke(cdp, [(1050, 700), (1051, 700)], page)
+    check("a Pencil tap on the page closes the menu without drawing a dot", page.locator(".hn-panel").count() == 0 and n_ink() == n1, f"{n_ink()} vs {n1}")
+    page.set_viewport_size({"width": 1180, "height": 620}); page.wait_for_timeout(250)
+    page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(200)
+    box = page.evaluate("(() => { const p = document.querySelector('.hn-panel').getBoundingClientRect(); const r = document.querySelector('.hn-root').getBoundingClientRect(); const el = document.querySelector('.hn-panel'); return {bottom: p.bottom, root: r.bottom, scrolls: el.scrollHeight > el.clientHeight} })()")
+    check("landscape: the colour menu stays on screen (scrolls inside)", box["bottom"] <= box["root"] + 1 and box["scrolls"], json.dumps(box))
+    page.screenshot(path=str(OUT / "landscape-menu.png"))
+    page.click(".hn-optionsbar button[aria-label='All colours']"); page.wait_for_timeout(100)
+    page.set_viewport_size({"width": 1180, "height": 820}); page.wait_for_timeout(250)
+
+    # smooth scrolling: a snapshot moves during the gesture; the real redraw happens at the end
+    y0 = sy()
+    touch(cdp, "touchStart", [(0, (700, 650))])
+    for k in range(1, 8): touch(cdp, "touchMove", [(0, (700, 650 - k * 20))], fresh=False); page.wait_for_timeout(16)
+    page.wait_for_timeout(50)
+    mid = page.evaluate("(() => ({ snap: getComputedStyle(document.querySelector('canvas.hn-snapshot')).display, stat: document.querySelector('canvas.excalidraw__canvas.static').style.visibility }))()")
+    touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(300)
+    after = page.evaluate("(() => ({ snap: getComputedStyle(document.querySelector('canvas.hn-snapshot')).display, stat: document.querySelector('canvas.excalidraw__canvas.static').style.visibility }))()")
+    check("scrolling moves a snapshot (no full redraw per finger movement)", mid["snap"] == "block" and mid["stat"] == "hidden", json.dumps(mid))
+    check("…and redraws properly when the finger lifts", after["snap"] == "none" and after["stat"] == "" and abs(sy() - (y0 - 140)) < 2, f"{json.dumps(after)} scrollY {sy()} vs {y0 - 140}")
+    check("no JavaScript errors (0.10)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # a late, older copy of the notebook from sync never removes writing
+    ctx, page, cdp, errors = open_page("?view")
+    page.wait_for_function("window.ctx !== undefined"); page.wait_for_timeout(500)
+    page.evaluate("ctx.minZoom = () => 0.25")
+    tap(page, "Ballpoint")
+    pen_stroke(cdp, line(300, 300, 500, 310, 20), page); page.wait_for_timeout(1300)
+    old = page.evaluate("fileText()")
+    for k in range(8):
+        pen_stroke(cdp, line(300, 340 + k * 30, 500, 345 + k * 30, 20), page); page.wait_for_timeout(1100)
+    before = page.evaluate("api.getSceneElements().length")
+    page.evaluate("(t => view.setViewData(JSON.stringify(JSON.parse(t), null, 2), false))(" + json.dumps(old) + ")"); page.wait_for_timeout(300)
+    check("an old copy arriving from sync doesn't remove anything you wrote since", page.evaluate("api.getSceneElements().length") == before, f"{page.evaluate('api.getSceneElements().length')} vs {before}")
+    newer = json.loads(page.evaluate("fileText()"))
+    extra = dict(newer["elements"][0]); extra["id"] = "from-other-device"; extra["y"] = extra["y"] + 400
+    newer["elements"].append(extra)
+    page.evaluate("(t => view.setViewData(t, false))(" + json.dumps(json.dumps(newer)) + ")"); page.wait_for_timeout(300)
+    check("…while writing from another device is added", page.evaluate("api.getSceneElements().some(e => e.id === 'from-other-device')") and page.evaluate("api.getSceneElements().length") == before + 1)
+    check("no JavaScript errors (sync)", not errors, "; ".join(errors[:3]))
     ctx.close()
 
     # ---------- one Handnote folder ----------

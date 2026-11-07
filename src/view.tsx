@@ -1,3 +1,4 @@
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import {
   FuzzySuggestModal,
   Notice,
@@ -103,8 +104,13 @@ export class HandnoteView extends TextFileView {
     // Ignore echoes of our own saves (even older ones arriving late, e.g. via iCloud);
     // remount for genuinely external changes (sync from another device).
     if (!clear && this.root && (data === this.lastSerialized || this.recentWrites.includes(data))) return;
-    // Unsaved changes here win over an older copy arriving from disk.
-    if (!clear && this.root && this.dirty) return;
+    // The file changed while open (sync). Never reload over what's on screen: merge stroke by
+    // stroke and keep whichever version of each stroke is newer. An old copy arriving late
+    // (iCloud) then changes nothing; strokes written on another device are added.
+    if (!clear && this.root && this.api) {
+      this.mergeFromDisk(data);
+      return;
+    }
 
     try {
       this.note = parseNote(data, this.plugin.store.get().core.defaultTemplate);
@@ -117,6 +123,29 @@ export class HandnoteView extends TextFileView {
     }
     this.lastSerialized = data;
     this.mount();
+  }
+
+  private mergeFromDisk(data: string) {
+    let incoming: HandnoteFile;
+    try {
+      incoming = parseNote(data, this.plugin.store.get().core.defaultTemplate);
+    } catch {
+      return; // half-written or broken copy: keep what we have
+    }
+    const api = this.api!;
+    const local = new Map(api.getSceneElementsIncludingDeleted().map((e) => [e.id, e]));
+    let changed = false;
+    for (const el of incoming.elements as { id: string; version: number }[]) {
+      const mine = local.get(el.id);
+      if (!mine || el.version > mine.version) {
+        local.set(el.id, el as never);
+        changed = true;
+      }
+    }
+    const pages = incoming.handnote.pages;
+    if (this.ctx && pages.sizes.length > this.ctx.state.pages.sizes.length) this.ctx.setPages(pages);
+    if (!changed) return;
+    api.updateScene({ elements: [...local.values()] as never, captureUpdate: CaptureUpdateAction.NEVER });
   }
 
   getViewData(): string {

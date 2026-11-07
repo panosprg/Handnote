@@ -485,3 +485,37 @@ export function PanelHost({
     </div>
   );
 }
+
+/** Bottom-of-page message ("Undo · Redo", "Deleted 3 strokes · Undo"). */
+export function Toast({ ctx }: { ctx: HandnoteContext }) {
+  const [t, setT] = useState<{ message: string; action?: { label: string; run: () => void }; id: number } | null>(null);
+  useEffect(() => {
+    let timer: number | null = null;
+    const off = ctx.events.on("toast" as never, ((next: typeof t) => {
+      setT(next);
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => setT(null), 3500);
+    }) as never);
+    return () => {
+      off();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [ctx]);
+  if (!t) return null;
+  return (
+    <div className={`hn-toast ${glassClass(ctx)}`} role="status" onPointerDown={(e) => e.stopPropagation()}>
+      <span>{t.message}</span>
+      {t.action && (
+        <button
+          className="hn-toast-btn"
+          onClick={() => {
+            t.action!.run();
+            setT(null);
+          }}
+        >
+          {t.action.label}
+        </button>
+      )}
+    </div>
+  );
+}

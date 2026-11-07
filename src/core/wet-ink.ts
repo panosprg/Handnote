@@ -102,6 +102,13 @@ export class WetInk {
     const s = (window.devicePixelRatio || 1) * st.zoom.value;
     g.setTransform(s, 0, 0, s, (el.x + st.scrollX) * s, (el.y + st.scrollY) * s);
     const tool = this.ctx.state.tool;
+    if (tool === "highlighter" && this.ctx.underLayer?.active) {
+      // Highlights are drawn under the ink (core/under-layer.ts), also while being written.
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, c.width, c.height);
+      this.ctx.underLayer.setLive(el);
+      return;
+    }
     if (tool === "dotted" || tool === "dashed") {
       // Same look as the Excalidraw line it becomes: width + 0.5, Excalidraw's dash pattern.
       const sw = el.strokeWidth as number;
@@ -130,6 +137,7 @@ export class WetInk {
    */
   end(committed: boolean) {
     this.el = null;
+    this.ctx.underLayer?.setLive(null);
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
     const clear = () => {

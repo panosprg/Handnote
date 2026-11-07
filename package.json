@@ -7,7 +7,7 @@
     "build": "tsc && node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
     "test": "npm run build:test && python3 test/run.py",
-    "build:test": "esbuild test/harness.tsx --bundle --outdir=test/out --format=iife --alias:obsidian=./test/obsidian-stub.ts --define:process.env.NODE_ENV=\\\"production\\\" --define:process.env.IS_PREACT=\\\"false\\\" --conditions=production --jsx=automatic --loader:.woff2=dataurl --log-level=error",
+    "build:test": "node scripts/build-test.mjs",
     "version": "node scripts/version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [],

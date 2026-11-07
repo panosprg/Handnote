@@ -72,6 +72,8 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
     if (h.kind === "tool") ctx.setTool(h.value);
     else ctx.setInkColor(h.value);
   };
+  const closeRef = useRef(close);
+  closeRef.current = close;
   const pickRef = useRef(pick);
   pickRef.current = pick;
 
@@ -110,12 +112,14 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
       if (e.pointerType !== "touch" || (e.target as HTMLElement)?.tagName !== "CANVAS") return;
       count++;
       if (ctx.claimedTouches.has(e.pointerId)) return clear();
+      // Never from a resting palm or while the Pencil is being used.
+      if (ctx.isPalm(e) || ctx.penBusy(1500)) return clear();
       if (count > 1 || live.current.menu) return clear();
       finger = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY };
       clear();
       timer = window.setTimeout(() => {
         timer = null;
-        if (!finger || count !== 1) return;
+        if (!finger || count !== 1 || ctx.penBusy(1500)) return;
         menuFinger = finger.id;
         openRef.current(finger.x, finger.y);
       }, live.current.settings.delay);
@@ -138,8 +142,13 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
       count = Math.max(0, count - 1);
       if (menuFinger === e.pointerId) {
         menuFinger = null;
+        // Slide-and-release picks — but only a real lift (not a touch iPadOS cancelled)
+        // after the finger deliberately slid out of the centre. Otherwise it stays open for a tap.
+        const m = live.current.menu;
+        const r = root.getBoundingClientRect();
+        const slid = m && Math.hypot(e.clientX - r.left - m.x, e.clientY - r.top - m.y) > R_IN;
         const h = relHit(e.clientX, e.clientY);
-        if (h) pickRef.current(h); // slide-and-release; otherwise it stays open for a tap
+        if (h && slid && e.type === "pointerup") pickRef.current(h);
       }
       if (finger?.id === e.pointerId) {
         finger = null;
@@ -147,11 +156,21 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
       }
     };
 
+    // The Pencil came down: a dial a palm was about to open is cancelled.
+    const offPen = ctx.events.on("penDown" as never, (() => {
+      clear();
+      finger = null;
+      if (menuFinger !== null) {
+        menuFinger = null;
+        closeRef.current?.();
+      }
+    }) as never);
     root.addEventListener("pointerdown", onDown, true);
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerup", onUp, true);
     window.addEventListener("pointercancel", onUp, true);
     return () => {
+      offPen();
       clear();
       root.removeEventListener("pointerdown", onDown, true);
       window.removeEventListener("pointermove", onMove, true);

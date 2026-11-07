@@ -667,3 +667,80 @@
   opacity: 0.45;
   pointer-events: none;
 }
+
+/* Bottom message (Undo / Deleted · Undo) */
+.hn-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--hn-text);
+  animation: hn-toast-in 0.18s ease-out;
+}
+.hn-root button.hn-toast-btn {
+  all: unset;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--hn-active-fg);
+  background: var(--hn-active);
+}
+@keyframes hn-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+/* Smooth scrolling: the ink snapshot that moves while a finger moves the page (core/fast-view.ts) */
+.hn-root canvas.hn-snapshot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+  display: none;
+}
+.hn-light canvas.hn-snapshot {
+  mix-blend-mode: multiply;
+}
+.hn-moving .hn-link-chip,
+.hn-moving .hn-selbar,
+.hn-moving .hn-cursor {
+  visibility: hidden;
+}
+
+/* Menus never run off the bottom of the screen (iPad landscape): they scroll inside instead. */
+.hn-panel {
+  box-sizing: border-box;
+  max-height: calc(100% - 74px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.hn-panel.hn-panel-top.hn-panel-below-options {
+  max-height: calc(100% - 120px);
+}
+
+/* Highlights + PDF pages under the ink (core/under-layer.ts) */
+.hn-root canvas.hn-under {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  display: none;
+}
+.hn-under-on .hn-sheet-img {
+  visibility: hidden;
+}

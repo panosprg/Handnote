@@ -9,8 +9,10 @@ import { fitWidth, Paper, PagesUi, type PaperHandle } from "./Paper";
 import { SelectionBar } from "./SelectionBar";
 import type { FeatureRegistry } from "./registry";
 import { useSettings, type SettingsStore, type Template } from "./settings";
+import { FastView } from "./fast-view";
+import { UnderLayer } from "./under-layer";
 import { BALLPOINT_FILTER, DASH_FILTER, HIGHLIGHTER_FILTER } from "./tools";
-import { FeatureBoundary, reportCrash } from "./ui";
+import { FeatureBoundary, reportCrash, Toast } from "./ui";
 
 export interface CanvasProps {
   initial: HandnoteFile;
@@ -73,7 +75,38 @@ export default function Canvas(props: CanvasProps) {
     const offHighlighter = c.pen.addFilter(HIGHLIGHTER_FILTER);
     const offDash = c.pen.addFilter(DASH_FILTER);
     c.tool("ballpoint")!.activate(c);
+    c.fastView = new FastView(c, (v) => paperRef.current?.update(v.scrollX, v.scrollY, v.zoom));
+    c.underLayer = new UnderLayer(c);
+    // Palm rejection: remember when the Pencil was last on (or hovering over) the screen.
+    const onPen = (e: PointerEvent) => {
+      if (e.pointerType !== "pen") return;
+      c.lastPenAt = performance.now();
+      if (e.type === "pointerdown") {
+        c.penDown = true;
+        c.events.emit("penDown" as never);
+      } else if (e.type === "pointerup" || e.type === "pointercancel") c.penDown = false;
+    };
+    const penEvents = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
+    for (const t of penEvents) window.addEventListener(t, onPen, true);
+    // Tapping the page closes an open menu (colours, paper). A Pencil tap that closes a menu
+    // doesn't also draw a dot.
+    const closeMenus = (e: PointerEvent) => {
+      const panel = c.state.panel;
+      if (!panel || panel === "outline") return;
+      const t = e.target as HTMLElement | null;
+      if (!t || t.tagName !== "CANVAS" || !c.root.contains(t)) return;
+      c.setState({ panel: null });
+      if (e.pointerType !== "touch") {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("pointerdown", closeMenus, true);
     return () => {
+      for (const t of penEvents) window.removeEventListener(t, onPen, true);
+      window.removeEventListener("pointerdown", closeMenus, true);
+      c.fastView?.destroy();
+      c.underLayer?.destroy();
       offBallpoint();
       offHighlighter();
       offDash();
@@ -260,6 +293,7 @@ export default function Canvas(props: CanvasProps) {
         />
       </div>
       {ctx && <PagesUi ctx={ctx} />}
+      {ctx && <Toast ctx={ctx} />}
       {ctx && <SelectionBar ctx={ctx} actions={enabled.flatMap((f) => f.selectionActions ?? [])} />}
       {overlays}
     </div>

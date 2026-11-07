@@ -8,6 +8,8 @@ import { INK_TOOLS, type CoreSettings, type HandnoteSettings, type InkToolId, ty
 import { PenPipeline } from "./pen";
 import { A4, maxWidth, pageAt, type PagesInfo } from "./pages";
 import { CORE_TOOLS, TOOL_GROUPS } from "./tools";
+import type { FastView, View } from "./fast-view";
+import type { UnderLayer } from "./under-layer";
 import type { ToolDef } from "./types";
 import type { PdfWord } from "./pdf-text";
 
@@ -312,8 +314,8 @@ export class HandnoteContext {
 
   /** The page in the middle of the screen (0-based). */
   currentPage(): number {
-    const st = this.api.getAppState();
-    return pageAt(this.state.pages, this.root.clientHeight / 2 / st.zoom.value - st.scrollY);
+    const st = this.view();
+    return pageAt(this.state.pages, this.root.clientHeight / 2 / st.zoom - st.scrollY);
   }
 
   /** The furthest you can zoom out: the page fills the screen width (like Goodnotes). */
@@ -358,17 +360,71 @@ export class HandnoteContext {
 
   /** Scene coordinates → pixels relative to the page's top-left corner. */
   toScreen(sceneX: number, sceneY: number) {
+    const st = this.view();
+    return { x: (sceneX + st.scrollX) * st.zoom, y: (sceneY + st.scrollY) * st.zoom };
+  }
+
+  /** The view as it is on screen right now (also in the middle of a finger gesture). */
+  view(): View {
+    if (this.fastView) return this.fastView.current();
     const st = this.api.getAppState();
-    return { x: (sceneX + st.scrollX) * st.zoom.value, y: (sceneY + st.scrollY) * st.zoom.value };
+    return { zoom: st.zoom.value, scrollX: st.scrollX, scrollY: st.scrollY };
+  }
+
+  /** A short message at the bottom of the page, optionally with one button (e.g. Undo). */
+  toast(message: string, action?: { label: string; run: () => void }) {
+    this.events.emit("toast" as never, { message, action, id: Date.now() } as never);
+  }
+
+  /* ---------- palm rejection ---------- */
+
+  /** When the Pencil last touched or hovered over the screen (performance.now()). */
+  lastPenAt = -Infinity;
+  penDown = false;
+
+  /** Is the Pencil in use (on the screen, or was a moment ago)? Fingers are ignored then. */
+  penBusy(withinMs = 900) {
+    return this.penDown || performance.now() - this.lastPenAt < withinMs;
+  }
+
+  /**
+   * Should this touch be ignored? While writing, the hand resting on the screen
+   * produces touches: those must never scroll, undo or open menus.
+   */
+  isPalm(e: PointerEvent) {
+    if (e.pointerType !== "touch") return false;
+    if (this.penBusy()) return true;
+    // A palm has a big contact area (iPadOS reports it as width/height).
+    return Math.max(e.width || 0, e.height || 0) > 44;
+  }
+
+  /** Set by Canvas: smooth scrolling/zooming during finger gestures (core/fast-view.ts). */
+  fastView: FastView | null = null;
+  /** Set by Canvas: highlights drawn under the ink (core/under-layer.ts). */
+  underLayer: UnderLayer | null = null;
+
+  /** Move/zoom the view. `moving`: a finger is still moving it (fast, redrawn properly at the end). */
+  setView(v: View, moving = false) {
+    if (moving && this.fastView) return this.fastView.set(v);
+    this.fastView?.end();
+    this.api.updateScene({
+      appState: { zoom: { value: v.zoom as never }, scrollX: v.scrollX, scrollY: v.scrollY },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }
+
+  /** The finger gesture that was moving the view has ended. */
+  endViewMove() {
+    this.fastView?.end();
   }
 
   /** Client (event) coordinates → scene coordinates. */
   toScene(clientX: number, clientY: number) {
-    const st = this.api.getAppState();
+    const st = this.view();
     const rect = this.root.getBoundingClientRect();
     return {
-      x: (clientX - rect.left) / st.zoom.value - st.scrollX,
-      y: (clientY - rect.top) / st.zoom.value - st.scrollY,
+      x: (clientX - rect.left) / st.zoom - st.scrollX,
+      y: (clientY - rect.top) / st.zoom - st.scrollY,
     };
   }
 

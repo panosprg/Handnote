@@ -8,6 +8,21 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.11.0 (7 Nov 2026)
+- Words deleted by accident, four causes fixed:
+  - Palm rejection: touches while/just after using the Pencil, or palm-sized contacts, do nothing.
+  - A touch iPadOS cancels never counts as a two-finger tap (used to run Undo).
+  - Scribble-to-delete only on real scribbles (must cross existing ink ≥4 times and cover it); never
+    on joined-up writing near an i-dot or accent.
+  - Long-press dial never opens from a palm, and never picks a tool on a cancelled or un-slid release.
+  - Sync: a late, older copy of the file is merged stroke by stroke (newest wins), never reloaded over your writing.
+  - Every gesture undo / scribble delete shows a message with Undo/Redo.
+- Smooth scrolling and zooming: a snapshot moves while the finger moves; one real redraw when it stops.
+  (Throttled test, 1,500 strokes: scroll 102 → ~31 ms per move incl. redraws, pinch 432 → 73 ms; laggy frames 122 → 8.)
+- Text under highlights stays dark on iPad: highlights are drawn on their own layer under the ink with the
+  canvas's own multiply (iPad Safari ignores the CSS blend: WebKit bug 286619). Exports unchanged.
+- Colour menu never goes off screen (scrolls inside in landscape); tapping the page closes it (a Pencil tap
+  that closes it doesn't draw).
 ### 0.10.0 (6 Nov 2026)
 - PDF annotation: text layer from the PDF (`text.json`, built on first open for older notebooks), highlighter snaps
   to words, colour meanings per notebook (defaults in the panel), key under each page and on exports, search,
