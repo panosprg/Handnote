@@ -80,6 +80,8 @@ export default function Canvas(props: CanvasProps) {
     // Palm rejection: remember when the Pencil was last on (or hovering over) the screen.
     const onPen = (e: PointerEvent) => {
       if (e.pointerType !== "pen") return;
+      // Only the Pencil touching the screen counts (not hovering near it).
+      if (e.type === "pointermove" && !e.buttons && !c.penDown) return;
       c.lastPenAt = performance.now();
       if (e.type === "pointerdown") {
         c.penDown = true;

@@ -346,6 +346,10 @@ class HandnoteSettingTab extends PluginSettingTab {
       .setName("Fast ink")
       .setDesc("Draws the line you're writing on its own layer, so the ink keeps up with the Pencil. Leave on unless something looks wrong while writing.")
       .addToggle((t) => t.setValue(s.core.fastInk).onChange((v) => setCore({ fastInk: v })));
+    new Setting(containerEl)
+      .setName("Smooth scrolling")
+      .setDesc("While a finger moves the page, a snapshot moves and the page is redrawn properly when you stop. Turn off if scrolling or zooming looks wrong.")
+      .addToggle((t) => t.setValue(s.core.fastScroll).onChange((v) => setCore({ fastScroll: v })));
 
     new Setting(containerEl).setName("Features").setHeading();
     for (const f of registry.all()) {

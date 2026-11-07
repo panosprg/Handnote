@@ -56,6 +56,8 @@ export interface CoreSettings {
   reduceTransparency: boolean;
   /** Draw the stroke being written on its own canvas (much less lag). */
   fastInk: boolean;
+  /** Move a snapshot while a finger scrolls/zooms (smooth); off = redraw on every movement. */
+  fastScroll: boolean;
   /** Fountain pen: line width follows Pencil pressure */
   pen: InkConfig;
   /** Even line width, like a ballpoint */
@@ -92,6 +94,7 @@ export const DEFAULT_CORE: CoreSettings = {
   defaultTemplate: "lined",
   reduceTransparency: false,
   fastInk: true,
+  fastScroll: true,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
   ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
   pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },

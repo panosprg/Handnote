@@ -173,7 +173,7 @@ export default defineFeature<S>({
         !tap.moved &&
         e.timeStamp - tap.start < 300 &&
         touches.size === tap.count &&
-        !ctx.penBusy(1500);
+        !ctx.penBusy(800);
       if (realTap && tap) {
         if (tap.count === 2 && s().twoFingerUndo) {
           ctx.undo();

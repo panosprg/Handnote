@@ -383,7 +383,7 @@ export class HandnoteContext {
   penDown = false;
 
   /** Is the Pencil in use (on the screen, or was a moment ago)? Fingers are ignored then. */
-  penBusy(withinMs = 900) {
+  penBusy(withinMs = 500) {
     return this.penDown || performance.now() - this.lastPenAt < withinMs;
   }
 
@@ -392,10 +392,8 @@ export class HandnoteContext {
    * produces touches: those must never scroll, undo or open menus.
    */
   isPalm(e: PointerEvent) {
-    if (e.pointerType !== "touch") return false;
-    if (this.penBusy()) return true;
-    // A palm has a big contact area (iPadOS reports it as width/height).
-    return Math.max(e.width || 0, e.height || 0) > 44;
+    // Only timing: iPadOS reports fingertips with large contact sizes too, so size can't tell a palm apart.
+    return e.pointerType === "touch" && this.penBusy();
   }
 
   /** Set by Canvas: smooth scrolling/zooming during finger gestures (core/fast-view.ts). */
@@ -405,7 +403,7 @@ export class HandnoteContext {
 
   /** Move/zoom the view. `moving`: a finger is still moving it (fast, redrawn properly at the end). */
   setView(v: View, moving = false) {
-    if (moving && this.fastView) return this.fastView.set(v);
+    if (moving && this.fastView && this.core.fastScroll !== false) return this.fastView.set(v);
     this.fastView?.end();
     this.api.updateScene({
       appState: { zoom: { value: v.zoom as never }, scrollX: v.scrollX, scrollY: v.scrollY },

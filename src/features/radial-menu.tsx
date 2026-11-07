@@ -113,13 +113,13 @@ function RadialMenu({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
       count++;
       if (ctx.claimedTouches.has(e.pointerId)) return clear();
       // Never from a resting palm or while the Pencil is being used.
-      if (ctx.isPalm(e) || ctx.penBusy(1500)) return clear();
+      if (ctx.isPalm(e) || ctx.penBusy(800)) return clear();
       if (count > 1 || live.current.menu) return clear();
       finger = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY };
       clear();
       timer = window.setTimeout(() => {
         timer = null;
-        if (!finger || count !== 1 || ctx.penBusy(1500)) return;
+        if (!finger || count !== 1 || ctx.penBusy(800)) return;
         menuFinger = finger.id;
         openRef.current(finger.x, finger.y);
       }, live.current.settings.delay);

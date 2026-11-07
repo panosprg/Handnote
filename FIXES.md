@@ -8,6 +8,11 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.11.1 (7 Nov 2026)
+- Fixed: 0.11.0 ignored most finger touches on iPad (fingertips report large contact sizes, and a hovering
+  Pencil counted as "in use"). Palm rejection now only uses timing: 0.5 s after the Pencil leaves the screen.
+- "Smooth scrolling" switch in settings (off = old behaviour).
+
 ### 0.11.0 (7 Nov 2026)
 - Words deleted by accident, four causes fixed:
   - Palm rejection: touches while/just after using the Pencil, or palm-sized contacts, do nothing.
