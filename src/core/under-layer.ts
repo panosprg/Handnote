@@ -162,16 +162,28 @@ export class UnderLayer {
       if (bx + (el.width as number) + pad < x1 || bx - pad > x2 || by + (el.height as number) + pad < y1 || by - pad > y2) {
         if (el !== this.live) continue;
       }
-      let p = this.paths.get(el.id);
-      if (!p || p.version !== el.version || el === this.live) {
-        p = { version: el.version as number, path: outlinePath(freedrawOutline(el, el !== this.live)) };
-        if (el !== this.live) this.paths.set(el.id, p);
-      }
       g.save();
       g.translate(bx, by);
       g.globalAlpha = ((el.opacity as number) ?? 100) / 100;
-      g.fillStyle = el.strokeColor as string;
-      g.fill(p.path);
+      if (el.type === "rectangle") {
+        // Word highlights on PDFs: a filled rounded box (Excalidraw's adaptive corner radius).
+        const w = el.width as number;
+        const h = el.height as number;
+        const m = Math.min(Math.abs(w), Math.abs(h));
+        const r = el.roundness ? (m <= 128 ? m * 0.25 : 32) : 0;
+        g.fillStyle = el.backgroundColor as string;
+        g.beginPath();
+        g.roundRect(0, 0, w, h, r);
+        g.fill();
+      } else {
+        let p = this.paths.get(el.id);
+        if (!p || p.version !== el.version || el === this.live) {
+          p = { version: el.version as number, path: outlinePath(freedrawOutline(el, el !== this.live)) };
+          if (el !== this.live) this.paths.set(el.id, p);
+        }
+        g.fillStyle = el.strokeColor as string;
+        g.fill(p.path);
+      }
       g.restore();
     }
     g.globalCompositeOperation = "source-over";

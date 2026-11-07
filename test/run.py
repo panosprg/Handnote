@@ -911,6 +911,15 @@ with sync_playwright() as p:
     hl = page.evaluate(hls)
     check("highlighting over PDF text snaps to the words and keeps the text",
           len(hl) == 1 and hl[0]["type"] == "rectangle" and hl[0]["text"] == "Evidence shows the results are significant.", str(hl))
+    page.wait_for_timeout(200)
+    under = page.evaluate("""(() => {
+        const e = api.getSceneElements().find(e => e.customData?.hn === 'hl' && e.type === 'rectangle');
+        const p = ctx.toScreen(e.x + e.width * 0.5, e.y + e.height * 0.5); const d = window.devicePixelRatio;
+        const px = sel => { const c = document.querySelector(sel); return [...c.getContext('2d').getImageData(Math.round(p.x * d), Math.round(p.y * d), 1, 1).data]; };
+        return { on: document.querySelector('.hn-root').classList.contains('hn-under-on'), under: px('canvas.hn-under'), stat: px('canvas.excalidraw__canvas.static') };
+    })()""")
+    check("PDF word highlights are drawn under the ink too (the PDF text stays dark on iPad)",
+          under["on"] and under["under"][3] == 255 and under["stat"][3] == 0, json.dumps(under))
     check("…the key under the page shows what the colour means", page.locator(".hn-legend").count() == 1 and "Evidence" in page.inner_text(".hn-legend"))
     undo(page)
     check("…one undo removes the highlight (and the key)", len(page.evaluate(hls)) == 0 and page.locator(".hn-legend").count() == 0)

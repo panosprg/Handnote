@@ -20,7 +20,8 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 - Smooth scrolling and zooming: a snapshot moves while the finger moves; one real redraw when it stops.
   (Throttled test, 1,500 strokes: scroll 102 → ~31 ms per move incl. redraws, pinch 432 → 73 ms; laggy frames 122 → 8.)
 - Text under highlights stays dark on iPad: highlights are drawn on their own layer under the ink with the
-  canvas's own multiply (iPad Safari ignores the CSS blend: WebKit bug 286619). Exports unchanged.
+  canvas's own multiply (iPad Safari ignores the CSS blend: WebKit bug 286619). Covers pen highlights and
+  0.10's PDF word highlights. Exports unchanged.
 - Colour menu never goes off screen (scrolls inside in landscape); tapping the page closes it (a Pencil tap
   that closes it doesn't draw).
 ### 0.10.0 (6 Nov 2026)

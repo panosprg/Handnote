@@ -9,9 +9,13 @@
  */
 import fs from "fs";
 
-const FIND = 'case"freedraw":{if(he.generateElementShape(e,null),i.isExporting){';
-const REPLACE =
-  'case"freedraw":{if(!i.isExporting&&globalThis.__hnHideHighlights&&e.customData&&e.customData.hn==="hl")break;if(he.generateElementShape(e,null),i.isExporting){';
+// Skip highlights (pen-stroke highlights, and the word highlights on PDFs, which are rectangles).
+const SKIP = 'if(!i.isExporting&&globalThis.__hnHideHighlights&&e.customData&&e.customData.hn==="hl")break;';
+const SITES = [
+  'case"freedraw":{if(he.generateElementShape(e,null),i.isExporting){',
+  'case"rectangle":case"diamond":case"ellipse":case"line":case"arrow":case"image":case"text":case"iframe":case"embeddable":{if(he.generateElementShape(e,i),i.isExporting){',
+];
+const patch = (src) => SITES.reduce((s, site) => s.replace(site, site.replace("{if(he.", `{${SKIP}if(he.`)), src);
 
 export const excalidrawPatch = {
   name: "excalidraw-patch",
@@ -20,9 +24,10 @@ export const excalidrawPatch = {
     build.onLoad({ filter: /@excalidraw[\\/]excalidraw[\\/]dist[\\/]prod[\\/]chunk-[A-Z0-9]+\.js$/ }, async (args) => {
       const src = await fs.promises.readFile(args.path, "utf8");
       if (!src.includes('case"freedraw":{if(he.generateElementShape')) return undefined;
-      if (!src.includes(FIND)) throw new Error("Handnote: Excalidraw's freedraw renderer changed; update scripts/excalidraw-patch.mjs");
+      for (const site of SITES)
+        if (!src.includes(site)) throw new Error("Handnote: Excalidraw's element renderer changed; update scripts/excalidraw-patch.mjs");
       patched = true;
-      return { contents: src.replace(FIND, REPLACE), loader: "js" };
+      return { contents: patch(src), loader: "js" };
     });
     build.onEnd((result) => {
       const prod = (build.initialOptions.conditions ?? []).includes("production");
