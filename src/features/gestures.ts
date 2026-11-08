@@ -41,11 +41,9 @@ export default defineFeature<S>({
     let tap: { start: number; count: number; moved: boolean; lastDown: number } | null = null;
     let pinch: { dist: number; zoom: number; cx: number; cy: number } | null = null;
 
-    // Tools where fingers only navigate. (Select and text keep fingers for themselves.)
-    const owns = () => {
-      const type = ctx.api.getAppState().activeTool.type;
-      return type === "freedraw" || type === "eraser" || type === "hand" || type === "laser";
-    };
+    // Like Goodnotes, fingers scroll and zoom in every tool (the Pencil draws, erases and
+    // selects). Only the text tool keeps fingers, so you can tap to place and edit text.
+    const owns = () => ctx.api.getAppState().activeTool.type !== "text";
 
     const rel = (x: number, y: number) => {
       const r = ctx.root.getBoundingClientRect();
@@ -173,7 +171,7 @@ export default defineFeature<S>({
         !tap.moved &&
         e.timeStamp - tap.start < 300 &&
         touches.size === tap.count &&
-        !ctx.penBusy(800);
+        !ctx.penBusy();
       if (realTap && tap) {
         if (tap.count === 2 && s().twoFingerUndo) {
           ctx.undo();

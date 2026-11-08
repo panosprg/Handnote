@@ -744,3 +744,13 @@
 .hn-under-on .hn-sheet-img {
   visibility: hidden;
 }
+
+/* Ink under highlights, drawn darker just above the ink (core/under-layer.ts) */
+.hn-root canvas.hn-over {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  display: none;
+}

@@ -36,11 +36,11 @@ def hover(cdp, x, y):
 
 def touch(cdp, kind, points, page=None, radius=None, fresh=True):
     # A finger put down well after the Pencil was used (palm rejection ignores touches right after writing).
-    if kind == "touchStart" and CURRENT_PAGE.get("page") is not None and fresh:
-        try:
-            CURRENT_PAGE["page"].evaluate("window.ctx && (ctx.lastPenAt = -Infinity, ctx.penDown = false)")
-        except Exception:
-            pass
+    if kind == "touchStart" and CURRENT_PAGE.get("page") is not None and fresh and not CURRENT_PAGE.get("down"):
+        # No resetting of Handnote's state (that once hid a real bug): just wait like a real hand
+        # (only before the first finger: the fingers of a pinch land together).
+        CURRENT_PAGE["page"].wait_for_timeout(560)
+    CURRENT_PAGE["down"] = len(points) if kind in ("touchStart", "touchMove") else (len(points) if kind == "touchEnd" else 0)
     pts = []
     for i, (x, y) in points:
         tp = {"x": x, "y": y, "id": i}
@@ -101,7 +101,7 @@ with sync_playwright() as p:
         CURRENT_PAGE["page"] = page
         # Most checks draw at 100% zoom; the zoom-out limit (page fills the width) has its own test.
         if free_zoom:
-            page.evaluate("window.ctx && (ctx.minZoom = () => 0.25)")
+            page.evaluate("window.ctx && (ctx.minZoom = () => 0.25, ctx.clampView = (v) => v)")
         return ctx, page, ctx.new_cdp_session(page), errors
 
     # ---------- pages: new notebook opens fitted to the screen ----------
@@ -667,6 +667,45 @@ with sync_playwright() as p:
     check("#2 pinching out stops at full width", z >= mz - 1e-3 and z < mz * 1.2, f"{z:.3f} vs {mz:.3f}")
     ctx.close()
 
+    # Goodnotes-style view: the notebook stays on screen, pinch to zoom
+    ctx, page, cdp, errors = open_page(free_zoom=False)
+    def vw(): return page.evaluate("(() => { const s = api.getAppState(); return {z: s.zoom.value, x: s.scrollX, y: s.scrollY} })()")
+    def page_box(): return page.evaluate("(() => { const r = document.querySelector('.hn-sheet').getBoundingClientRect(); const o = document.querySelector('.hn-root').getBoundingClientRect(); return {l: r.left - o.left, r: o.right - r.right, t: r.top - o.top} })()")
+    b = page_box()
+    check("the page fills the width, centred", abs(b["l"] - b["r"]) < 2 and b["l"] < 30, json.dumps(b))
+    v0 = vw()
+    touch(cdp, "touchStart", [(0, (600, 600))])
+    for k in range(1, 15): touch(cdp, "touchMove", [(0, (600 + k * 25, 600 + k * 30))], fresh=False); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(350)
+    v1 = vw(); b = page_box()
+    check("dragging sideways/down can't push the page off screen", abs(v1["x"] - v0["x"]) < 0.5 and b["t"] <= 121 and abs(b["l"] - b["r"]) < 2, f"{json.dumps(v1)} {json.dumps(b)}")
+    touch(cdp, "touchStart", [(0, (600, 700))])
+    for k in range(1, 20): touch(cdp, "touchMove", [(0, (600, 700 - k * 25))], fresh=False); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(350)
+    check("…but scrolling down the notebook works", vw()["y"] < v0["y"] - 100, json.dumps(vw()))
+    # pinch to zoom in, move around inside the page, pinch back out
+    touch(cdp, "touchStart", [(0, (550, 450))]); touch(cdp, "touchStart", [(0, (550, 450)), (1, (650, 450))], fresh=False)
+    for k in range(1, 16): touch(cdp, "touchMove", [(0, (550 - k * 12, 450)), (1, (650 + k * 12, 450))], fresh=False); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", [(1, (830, 450))], fresh=False); touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(350)
+    zin = vw()
+    check("pinch zooms in", zin["z"] > v0["z"] * 1.8, json.dumps(zin))
+    for rep in range(4):  # drag right far past the page's left edge
+        touch(cdp, "touchStart", [(0, (200, 450))])
+        for k in range(1, 25): touch(cdp, "touchMove", [(0, (200 + k * 40, 450))], fresh=False); page.wait_for_timeout(12)
+        touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(300)
+    b = page_box()
+    check("zoomed in, you can move around but not past the page's edge", -1 <= b["l"] <= 25, json.dumps(b))
+    touch(cdp, "touchStart", [(0, (300, 450))]); touch(cdp, "touchStart", [(0, (300, 450)), (1, (900, 450))], fresh=False)
+    for k in range(1, 20): touch(cdp, "touchMove", [(0, (300 + k * 14, 450)), (1, (900 - k * 14, 450))], fresh=False); page.wait_for_timeout(16)
+    touch(cdp, "touchEnd", [(1, (634, 450))], fresh=False); touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(350)
+    b = page_box()
+    check("pinching back out snaps to the page filling the width", abs(vw()["z"] - v0["z"]) < 1e-3 and abs(b["l"] - b["r"]) < 2, f"{json.dumps(vw())} {json.dumps(b)}")
+    page.evaluate("api.updateScene({appState: {scrollX: 500, scrollY: 2000}})"); page.wait_for_timeout(200)
+    b = page_box()
+    check("other ways of moving the view (outline jumps, keyboard) are kept on the page too", abs(b["l"] - b["r"]) < 2 and b["t"] <= 121, json.dumps(b))
+    check("no JavaScript errors (view limits)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
     # #10 #12 the real view: template remembered, saved dot, echoes
     ctx, page, cdp, errors = open_page("?view")
     page.wait_for_function("window.ctx !== undefined"); page.wait_for_timeout(500)
@@ -710,6 +749,25 @@ with sync_playwright() as p:
     tap(page, "Ballpoint")
     for k in range(3):
         pen_stroke(cdp, [(300 + k * 70 + i * 2, 300 + 10 * math.sin(i / 3)) for i in range(25)], page)
+    n0 = n_ink()
+
+    # after writing, erasing or lassoing with the Pencil, fingers work again (no reset, real waiting)
+    for label, tool_label, pts in [("writing", "Ballpoint", line(300, 450, 400, 455, 15)),
+                                   ("erasing", "Precision eraser", line(600, 450, 650, 455, 10)),
+                                   ("using the lasso", "Lasso", [(600 + 40 * math.cos(t / 10 * 6.28), 500 + 40 * math.sin(t / 10 * 6.28)) for t in range(11)])]:
+        if tool_label == "Lasso":
+            page.evaluate("ctx.setTool('lasso')")
+        else:
+            tap(page, tool_label)
+        pen_stroke(cdp, pts, page)
+        page.keyboard.press("Escape")
+        y1 = sy()
+        touch(cdp, "touchStart", [(0, (1000, 650))])
+        for k in range(1, 8): touch(cdp, "touchMove", [(0, (1000, 650 - k * 20))], fresh=False); page.wait_for_timeout(16)
+        touch(cdp, "touchEnd", [], fresh=False); page.wait_for_timeout(300)
+        check(f"fingers scroll again half a second after {label} with the Pencil", abs(sy() - (y1 - 140)) < 3, f"pen down stuck? {page.evaluate('ctx.penDown')}, scrollY {sy()} vs {y1 - 140}")
+        page.evaluate(f"api.updateScene({{appState: {{scrollY: {y1}}}}})"); page.wait_for_timeout(100)
+    tap(page, "Ballpoint")
     n0 = n_ink()
 
     # palm rejection
@@ -796,6 +854,13 @@ with sync_playwright() as p:
     })()""")
     check("highlights are drawn under the ink (never over text), not by Excalidraw on screen",
           hl["on"] and hl["under"][3] > 0 and hl["stat"][3] == 0, json.dumps(hl))
+    over = page.evaluate("""(() => { const c = document.querySelector('canvas.hn-over'); if (!c) return -1;
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n })()""")
+    check("writing under a highlight is redrawn darker", over > 100, f"{over} px")
+    page.evaluate("store.updateCore({darkenUnderHighlights: false})"); page.wait_for_timeout(200)
+    off = page.evaluate("""(() => { const c = document.querySelector('canvas.hn-over'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n })()""")
+    check("…and the setting turns it off", off == 0, f"{off} px")
+    page.evaluate("store.updateCore({darkenUnderHighlights: true})")
     tap(page, "Ballpoint")
 
     # menus: close when you tap the page; never off the screen

@@ -8,6 +8,17 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.12.0 (8 Nov 2026)
+- Fixed: after the first Pencil stroke, fingers stopped working (the pen code swallowed the Pencil's lift, so
+  Handnote thought the Pencil was still down and treated every finger as a palm). The Pencil is now tracked
+  before any tool sees its events, and "Pencil down" expires by itself after 3 s without Pencil activity.
+- Fingers scroll and zoom in every tool (lasso and select too), except the text tool.
+- Goodnotes-style view: the notebook fills the width, centred, and can't be pushed off screen; pinch to zoom in
+  and move around inside the pages; zooming out snaps back to the full width.
+- Text under highlights drawn darker (handwriting and PDF text), without relying on CSS blending. Setting:
+  "Darker text under highlights".
+- Tests no longer reset Handnote's state before finger gestures (that hid the bug above).
+
 ### 0.11.1 (7 Nov 2026)
 - Fixed: 0.11.0 ignored most finger touches on iPad (fingertips report large contact sizes, and a hovering
   Pencil counted as "in use"). Palm rejection now only uses timing: 0.5 s after the Pencil leaves the screen.

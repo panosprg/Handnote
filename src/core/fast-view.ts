@@ -97,10 +97,10 @@ export class FastView {
     const ty = (t.scrollY - b.scrollY) * t.zoom;
     this.snap.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
     // The highlights/PDF layer under the ink moves the same way until it is redrawn.
-    const under = this.ctx.underLayer?.canvas;
-    if (under) {
-      under.style.transformOrigin = "0 0";
-      under.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+    for (const layer of [this.ctx.underLayer?.canvas, this.ctx.underLayer?.overCanvas]) {
+      if (!layer) continue;
+      layer.style.transformOrigin = "0 0";
+      layer.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
     }
     this.paper(t);
     this.ctx.events.emit("scroll", t.scrollX, t.scrollY, t.zoom);
@@ -146,7 +146,8 @@ export class FastView {
   }
 
   /** The gesture ended: one real redraw, then the snapshot goes away. */
-  end() {
+  end(final?: View) {
+    if (final && this.target) this.target = final;
     const t = this.target;
     if (!t) return;
     if (this.frame !== null) cancelAnimationFrame(this.frame);

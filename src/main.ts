@@ -350,6 +350,10 @@ class HandnoteSettingTab extends PluginSettingTab {
       .setName("Smooth scrolling")
       .setDesc("While a finger moves the page, a snapshot moves and the page is redrawn properly when you stop. Turn off if scrolling or zooming looks wrong.")
       .addToggle((t) => t.setValue(s.core.fastScroll).onChange((v) => setCore({ fastScroll: v })));
+    new Setting(containerEl)
+      .setName("Darker text under highlights")
+      .setDesc("Handwriting and PDF text under a highlight are drawn darker, so they stand out.")
+      .addToggle((t) => t.setValue(s.core.darkenUnderHighlights).onChange((v) => setCore({ darkenUnderHighlights: v })));
 
     new Setting(containerEl).setName("Features").setHeading();
     for (const f of registry.all()) {

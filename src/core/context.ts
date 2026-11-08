@@ -6,7 +6,7 @@ import { Emitter } from "./emitter";
 import type { FeatureRegistry } from "./registry";
 import { INK_TOOLS, type CoreSettings, type HandnoteSettings, type InkToolId, type SettingsStore, type Template } from "./settings";
 import { PenPipeline } from "./pen";
-import { A4, maxWidth, pageAt, type PagesInfo } from "./pages";
+import { A4, maxWidth, pageAt, totalHeight, type PagesInfo } from "./pages";
 import { CORE_TOOLS, TOOL_GROUPS } from "./tools";
 import type { FastView, View } from "./fast-view";
 import type { UnderLayer } from "./under-layer";
@@ -95,6 +95,8 @@ export interface CtxEvents extends Record<string, unknown[]> {
 /**
  * Everything a feature can see and do. One context per open note.
  */
+const PEN_EVENTS = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
+
 export class HandnoteContext {
   readonly events = new Emitter<CtxEvents>();
   /** Every ink stroke passes through here; features add filters. */
@@ -128,6 +130,9 @@ export class HandnoteContext {
       meta: initial.meta ?? {},
       saveStatus: "saved",
     };
+    // Track the Pencil before anything else can see (and swallow) its events: the pen
+    // pipeline, erasers and lasso all stop them, and a missed lift would lock out the fingers.
+    for (const t of PEN_EVENTS) window.addEventListener(t, this.trackPen, true);
     this.pen = new PenPipeline(this);
     // Re-apply ink settings when colours/sizes change anywhere.
     let lastCore = store.get().core;
@@ -140,7 +145,10 @@ export class HandnoteContext {
     });
   }
 
+  private trackPen = (e: PointerEvent) => this.notePen(e);
+
   destroy() {
+    for (const t of PEN_EVENTS) window.removeEventListener(t, this.trackPen, true);
     this.unsub();
     this.pen.destroy();
   }
@@ -384,7 +392,25 @@ export class HandnoteContext {
 
   /** Is the Pencil in use (on the screen, or was a moment ago)? Fingers are ignored then. */
   penBusy(withinMs = 500) {
+    // Safety net: a lift we never saw can't lock out the fingers.
+    if (this.penDown && performance.now() - this.lastPenAt > 3000) this.penDown = false;
     return this.penDown || performance.now() - this.lastPenAt < withinMs;
+  }
+
+  /**
+   * Record what the Pencil is doing. Called by the pen pipeline itself (which then swallows the
+   * events, so nothing listening later would see the lift) and by a window listener for the rest.
+   */
+  notePen(e: PointerEvent) {
+    if (e.pointerType !== "pen") return;
+    // Only the Pencil touching the screen counts (not hovering near it).
+    if (e.type === "pointermove" && !e.buttons && !this.penDown) return;
+    this.lastPenAt = performance.now();
+    if (e.type === "pointerdown") {
+      const was = this.penDown;
+      this.penDown = true;
+      if (!was) this.events.emit("penDown" as never);
+    } else if (e.type === "pointerup" || e.type === "pointercancel") this.penDown = false;
   }
 
   /**
@@ -401,19 +427,49 @@ export class HandnoteContext {
   /** Set by Canvas: highlights drawn under the ink (core/under-layer.ts). */
   underLayer: UnderLayer | null = null;
 
+  /**
+   * Keep the notebook on screen, like Goodnotes: zoomed out, the pages fill the width and stay
+   * centred; zoomed in, you can move around but not off the pages. `settled`: the finger has
+   * lifted (while it's down, a little extra room past the last page lets you pull to add one).
+   */
+  clampView(v: View, settled = true): View {
+    const vw = this.root.clientWidth || 800;
+    const vh = this.root.clientHeight || 600;
+    const zoom = Math.min(5, Math.max(this.minZoom(), v.zoom));
+    const W = maxWidth(this.state.pages);
+    const H = totalHeight(this.state.pages);
+    const visW = vw / zoom;
+    const visH = vh / zoom;
+    const side = 24 / zoom;
+    let scrollX = v.scrollX;
+    if (W + 2 * side <= visW + 0.5) scrollX = (visW - W) / 2; // fits: centred, no sideways drifting
+    else scrollX = Math.min(side, Math.max(visW - W - side, scrollX));
+    const top = 120 / zoom; // room under the toolbar above the first page
+    const bottom = (settled ? 80 : 320) / zoom;
+    const maxY = top;
+    const minY = Math.min(top, visH - H - bottom);
+    const scrollY = Math.min(maxY, Math.max(minY, v.scrollY));
+    return { zoom, scrollX, scrollY };
+  }
+
   /** Move/zoom the view. `moving`: a finger is still moving it (fast, redrawn properly at the end). */
   setView(v: View, moving = false) {
-    if (moving && this.fastView && this.core.fastScroll !== false) return this.fastView.set(v);
-    this.fastView?.end();
+    const c = this.clampView(v, !moving);
+    if (moving && this.fastView && this.core.fastScroll !== false) return this.fastView.set(c);
+    if (this.fastView?.active) return this.fastView.end(c);
     this.api.updateScene({
-      appState: { zoom: { value: v.zoom as never }, scrollX: v.scrollX, scrollY: v.scrollY },
+      appState: { zoom: { value: c.zoom as never }, scrollX: c.scrollX, scrollY: c.scrollY },
       captureUpdate: CaptureUpdateAction.NEVER,
     });
   }
 
-  /** The finger gesture that was moving the view has ended. */
+  /** The finger gesture that was moving the view has ended: settle inside the pages. */
   endViewMove() {
-    this.fastView?.end();
+    const settled = this.clampView(this.view(), true);
+    if (this.fastView?.active) return this.fastView.end(settled);
+    const cur = this.view();
+    if (Math.abs(cur.scrollX - settled.scrollX) + Math.abs(cur.scrollY - settled.scrollY) + Math.abs(cur.zoom - settled.zoom) > 0.01)
+      this.setView(settled);
   }
 
   /** Client (event) coordinates → scene coordinates. */

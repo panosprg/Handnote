@@ -58,6 +58,8 @@ export interface CoreSettings {
   fastInk: boolean;
   /** Move a snapshot while a finger scrolls/zooms (smooth); off = redraw on every movement. */
   fastScroll: boolean;
+  /** Redraw text (ink and PDF) under highlights darker. */
+  darkenUnderHighlights: boolean;
   /** Fountain pen: line width follows Pencil pressure */
   pen: InkConfig;
   /** Even line width, like a ballpoint */
@@ -95,6 +97,7 @@ export const DEFAULT_CORE: CoreSettings = {
   reduceTransparency: false,
   fastInk: true,
   fastScroll: true,
+  darkenUnderHighlights: true,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
   ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
   pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },

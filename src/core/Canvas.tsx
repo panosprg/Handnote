@@ -78,18 +78,7 @@ export default function Canvas(props: CanvasProps) {
     c.fastView = new FastView(c, (v) => paperRef.current?.update(v.scrollX, v.scrollY, v.zoom));
     c.underLayer = new UnderLayer(c);
     // Palm rejection: remember when the Pencil was last on (or hovering over) the screen.
-    const onPen = (e: PointerEvent) => {
-      if (e.pointerType !== "pen") return;
-      // Only the Pencil touching the screen counts (not hovering near it).
-      if (e.type === "pointermove" && !e.buttons && !c.penDown) return;
-      c.lastPenAt = performance.now();
-      if (e.type === "pointerdown") {
-        c.penDown = true;
-        c.events.emit("penDown" as never);
-      } else if (e.type === "pointerup" || e.type === "pointercancel") c.penDown = false;
-    };
-    const penEvents = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
-    for (const t of penEvents) window.addEventListener(t, onPen, true);
+
     // Tapping the page closes an open menu (colours, paper). A Pencil tap that closes a menu
     // doesn't also draw a dot.
     const closeMenus = (e: PointerEvent) => {
@@ -105,7 +94,6 @@ export default function Canvas(props: CanvasProps) {
     };
     window.addEventListener("pointerdown", closeMenus, true);
     return () => {
-      for (const t of penEvents) window.removeEventListener(t, onPen, true);
       window.removeEventListener("pointerdown", closeMenus, true);
       c.fastView?.destroy();
       c.underLayer?.destroy();
@@ -275,19 +263,16 @@ export default function Canvas(props: CanvasProps) {
             }
           }}
           onScrollChange={(x, y, zoom) => {
-            // Never smaller than the page filling the screen width (also for wheel/keyboard zoom).
-            const min = ctx?.minZoom();
-            if (ctx && min && zoom.value < min - 1e-3) {
-              const cx = ctx.root.clientWidth / 2;
-              const cy = ctx.root.clientHeight / 2;
-              const sx = cx / zoom.value - x;
-              const sy = cy / zoom.value - y;
-              queueMicrotask(() =>
-                ctx.api.updateScene({
-                  appState: { zoom: { value: min as never }, scrollX: cx / min - sx, scrollY: cy / min - sy },
-                  captureUpdate: CaptureUpdateAction.NEVER,
-                }),
-              );
+            // Keep the notebook on screen (also for wheel/keyboard zoom, outline jumps, the hand tool).
+            if (ctx) {
+              const want = ctx.clampView({ zoom: zoom.value, scrollX: x, scrollY: y }, !ctx.fastView?.active);
+              if (Math.abs(want.zoom - zoom.value) > 1e-3 || Math.abs(want.scrollX - x) > 0.5 || Math.abs(want.scrollY - y) > 0.5)
+                queueMicrotask(() =>
+                  ctx.api.updateScene({
+                    appState: { zoom: { value: want.zoom as never }, scrollX: want.scrollX, scrollY: want.scrollY },
+                    captureUpdate: CaptureUpdateAction.NEVER,
+                  }),
+                );
             }
             updatePaper(x, y, zoom.value);
             ctx?.events.emit("scroll", x, y, zoom.value);

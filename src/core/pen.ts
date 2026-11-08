@@ -170,6 +170,7 @@ export class PenPipeline {
   }
 
   private onMove = (e: PointerEvent) => {
+    this.ctx.notePen(e);
     const a = this.active;
     if (!a || !e.isTrusted || e.pointerId !== a.pointerId) return;
     e.stopImmediatePropagation();
@@ -193,6 +194,7 @@ export class PenPipeline {
   };
 
   private onUp = (e: PointerEvent) => {
+    this.ctx.notePen(e);
     const a = this.active;
     if (!a || !e.isTrusted || e.pointerId !== a.pointerId) return;
     e.stopImmediatePropagation();
@@ -222,6 +224,7 @@ export class PenPipeline {
   };
 
   private onCancel = (e: PointerEvent) => {
+    this.ctx.notePen(e);
     const a = this.active;
     if (!a || e.pointerId !== a.pointerId) return;
     this.active = null;
