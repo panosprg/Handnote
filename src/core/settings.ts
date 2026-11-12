@@ -60,6 +60,8 @@ export interface CoreSettings {
   fastScroll: boolean;
   /** Redraw text (ink and PDF) under highlights darker. */
   darkenUnderHighlights: boolean;
+  /** Small live readout of how fast things are (for finding lag on the iPad). */
+  showPerf: boolean;
   /** Fountain pen: line width follows Pencil pressure */
   pen: InkConfig;
   /** Even line width, like a ballpoint */
@@ -98,6 +100,7 @@ export const DEFAULT_CORE: CoreSettings = {
   fastInk: true,
   fastScroll: true,
   darkenUnderHighlights: true,
+  showPerf: false,
   pen: { color: "#1e1e1e", width: 1, opacity: 100 },
   ballpoint: { color: "#1e1e1e", width: 1, opacity: 100 },
   pencil: { color: "#4a4a52", width: 0.5, opacity: 75 },

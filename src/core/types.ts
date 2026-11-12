@@ -34,6 +34,8 @@ export interface ToolDef {
   order: number;
   /** Tools in a group share one toolbar button (e.g. the pen types behind "Pen"). */
   group?: string;
+  /** Only shown when this is true (e.g. "Select text" only in PDF notebooks). */
+  when?(ctx: HandnoteContext): boolean;
   /** Shown when the tool is tapped while already active (e.g. colour & size). */
   Panel?: ComponentType<{ ctx: HandnoteContext }>;
 }

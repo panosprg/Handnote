@@ -244,6 +244,8 @@ function Search({ ctx }: { ctx: HandnoteContext }) {
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  // "Search" on selected PDF text (pdf-select.tsx) fills in the search box.
+  useEffect(() => ctx.events.on("pdfSearchFor" as never, ((q: string) => setQuery(q)) as never), [ctx]);
   const deferred = useDeferredValue(query);
   const open = ui.panel === "search" && !!ui.pageText;
 

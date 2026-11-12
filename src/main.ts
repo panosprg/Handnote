@@ -354,6 +354,10 @@ class HandnoteSettingTab extends PluginSettingTab {
       .setName("Darker text under highlights")
       .setDesc("Handwriting and PDF text under a highlight are drawn darker, so they stand out.")
       .addToggle((t) => t.setValue(s.core.darkenUnderHighlights).onChange((v) => setCore({ darkenUnderHighlights: v })));
+    new Setting(containerEl)
+      .setName("Show performance meter")
+      .setDesc("A small readout at the bottom-left of each notebook: how long the page takes after you lift the Pencil, scrolling smoothness, and the size of the notebook. Take a screenshot of it if something feels slow.")
+      .addToggle((t) => t.setValue(s.core.showPerf).onChange((v) => setCore({ showPerf: v })));
 
     new Setting(containerEl).setName("Features").setHeading();
     for (const f of registry.all()) {

@@ -754,3 +754,38 @@
   transform-origin: 0 0;
   display: none;
 }
+
+/* With highlights on their own layer (core/under-layer.ts) the ink no longer needs to be
+   blended onto the page: plain drawing is correct and much cheaper to composite. */
+.hn-under-on canvas.excalidraw__canvas.static,
+.hn-under-on canvas.hn-wet,
+.hn-under-on canvas.hn-snapshot {
+  mix-blend-mode: normal !important;
+}
+
+/* Performance meter (Settings → Show performance meter) */
+.hn-perf {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hn-text);
+  pointer-events: none;
+}
+.hn-perf .good {
+  color: #1f8a3b;
+}
+.hn-perf .meh {
+  color: #b7791f;
+}
+.hn-perf .bad {
+  color: #d03a2f;
+  font-weight: 600;
+}

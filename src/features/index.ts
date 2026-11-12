@@ -17,6 +17,7 @@ import ruler from "./ruler";
 import highlighterBehind from "./highlighter-behind";
 import lasso from "./lasso";
 import pdfAnnotate from "./pdf-annotate";
+import pdfSelect from "./pdf-select";
 import radialMenu from "./radial-menu";
 import scribbleDelete from "./scribble-delete";
 import shapeSnap from "./shape-snap";
@@ -27,6 +28,7 @@ export const BUILT_IN_FEATURES: HandnoteFeature<any>[] = [
   toolbar,
   erasers,
   lasso,
+  pdfSelect,
   stabilizer,
   shapeSnap,
   highlighterBehind,

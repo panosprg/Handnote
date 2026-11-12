@@ -235,6 +235,7 @@ export class PenPipeline {
 
   /** Fast ink: hand the finished stroke to Excalidraw as one element, one undo step. */
   private commit(a: Active) {
+    this.ctx.measure("lift");
     const el = a.wet!;
     // Like Excalidraw: the lift position is the stroke's last point (also turns a tap into a dot).
     const pts = el.points as [number, number][];

@@ -519,3 +519,29 @@ export function Toast({ ctx }: { ctx: HandnoteContext }) {
     </div>
   );
 }
+
+/** Settings → Show performance meter: numbers from the real device, for finding lag. */
+export function PerfMeter({ ctx }: { ctx: HandnoteContext }) {
+  const settings = useSettings(ctx.store);
+  const [, tick] = useState(0);
+  useEffect(() => ctx.events.on("perf" as never, (() => tick((t) => t + 1)) as never), [ctx]);
+  if (!settings.core.showPerf) return null;
+  const p = ctx.perf;
+  const els = ctx.elements();
+  const ink = els.filter((e) => e.type === "freedraw").length;
+  const hl = els.filter((e) => (e.customData as { hn?: string } | undefined)?.hn === "hl").length;
+  const rate = (ms: number, ok: number, bad: number) => (ms === 0 ? "" : ms <= ok ? "good" : ms <= bad ? "meh" : "bad");
+  return (
+    <div className={`hn-perf ${glassClass(ctx)}`} onPointerDown={(e) => e.stopPropagation()}>
+      <span className={rate(p.lift, 50, 120)}>After lifting the Pencil {Math.round(p.lift)} ms</span>
+      <span className={p.scrollFps ? (p.scrollFps >= 50 ? "good" : p.scrollFps >= 30 ? "meh" : "bad") : ""}>
+        Scrolling {p.scrollFps ? `${p.scrollFps} fps` : "–"}
+        {p.scrollWorstFrame ? ` (worst ${p.scrollWorstFrame} ms)` : ""}
+      </span>
+      <span className={rate(p.redraw, 80, 200)}>Redraw after scrolling {Math.round(p.redraw)} ms</span>
+      <span>
+        {ink} strokes · {hl} highlights · {ctx.state.pages.sizes.length} pages · zoom {Math.round(ctx.view().zoom * 100)}%
+      </span>
+    </div>
+  );
+}

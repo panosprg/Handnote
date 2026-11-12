@@ -12,7 +12,7 @@ import { useSettings, type SettingsStore, type Template } from "./settings";
 import { FastView } from "./fast-view";
 import { UnderLayer } from "./under-layer";
 import { BALLPOINT_FILTER, DASH_FILTER, HIGHLIGHTER_FILTER } from "./tools";
-import { FeatureBoundary, reportCrash, Toast } from "./ui";
+import { FeatureBoundary, PerfMeter, reportCrash, Toast } from "./ui";
 
 export interface CanvasProps {
   initial: HandnoteFile;
@@ -281,6 +281,7 @@ export default function Canvas(props: CanvasProps) {
       </div>
       {ctx && <PagesUi ctx={ctx} />}
       {ctx && <Toast ctx={ctx} />}
+      {ctx && <PerfMeter ctx={ctx} />}
       {ctx && <SelectionBar ctx={ctx} actions={enabled.flatMap((f) => f.selectionActions ?? [])} />}
       {overlays}
     </div>

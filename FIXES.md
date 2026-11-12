@@ -8,6 +8,15 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.13.0 (12 Nov 2026)
+- Select text in PDFs: "Select text" tool (PDF notebooks only). Drag the Pencil over words, tap a word, drag
+  from either end to adjust; Copy (joins hyphenated line breaks), Highlight (word highlights, one undo step),
+  Search. Fingers keep scrolling.
+- Less work after each Pencil lift (heavy PDF notebook, CPU slowed 4x: ~400 → ~230 ms): the highlight/PDF layer
+  only redraws when highlights or the view change; "darker text" draws only new strokes and darkens each PDF
+  page once (not once per highlight).
+- Performance meter (Settings → Show performance meter) for real numbers from the iPad.
+
 ### 0.12.0 (8 Nov 2026)
 - Fixed: after the first Pencil stroke, fingers stopped working (the pen code swallowed the Pencil's lift, so
   Handnote thought the Pencil was still down and treated every finger as a palm). The Pencil is now tracked

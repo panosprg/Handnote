@@ -72,8 +72,23 @@ export class FastView {
   }
 
   /** Move the view (during a finger gesture). Applied once per frame. */
+  /** Frames shown during the current gesture (performance meter). */
+  private frames: { start: number; last: number; n: number; worst: number; loop: number | null } | null = null;
+  private countFrames = (t: number) => {
+    const f = this.frames;
+    if (!f) return;
+    if (f.n) f.worst = Math.max(f.worst, t - f.last);
+    f.last = t;
+    f.n++;
+    f.loop = requestAnimationFrame(this.countFrames);
+  };
+
   set(v: View) {
     if (!this.target) {
+      if (this.ctx.core.showPerf) {
+        const now = performance.now();
+        this.frames = { start: now, last: now, n: 0, worst: 0, loop: requestAnimationFrame(this.countFrames) };
+      }
       if (!this.takeSnapshot()) {
         this.commitNow(v);
         return;
@@ -150,6 +165,17 @@ export class FastView {
     if (final && this.target) this.target = final;
     const t = this.target;
     if (!t) return;
+    const f = this.frames;
+    if (f) {
+      if (f.loop !== null) cancelAnimationFrame(f.loop);
+      const secs = (f.last - f.start) / 1000;
+      if (secs > 0.15) {
+        this.ctx.perf.scrollFps = Math.round(f.n / secs);
+        this.ctx.perf.scrollWorstFrame = Math.round(f.worst);
+      }
+      this.frames = null;
+    }
+    this.ctx.measure("redraw");
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null;
     this.apply();

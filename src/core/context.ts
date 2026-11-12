@@ -205,6 +205,7 @@ export class HandnoteContext {
     const out: (ToolDef & { member: string; key: string })[] = [];
     const seen = new Set<string>();
     for (const t of this.tools()) {
+      if (t.when && !t.when(this)) continue;
       if (!t.group) {
         out.push({ ...t, member: t.id, key: t.id });
         continue;
@@ -377,6 +378,22 @@ export class HandnoteContext {
     if (this.fastView) return this.fastView.current();
     const st = this.api.getAppState();
     return { zoom: st.zoom.value, scrollX: st.scrollX, scrollY: st.scrollY };
+  }
+
+  /** Timings for the performance meter (Settings → Show performance meter). */
+  perf = { lift: 0, liftWorst: 0, scrollFps: 0, scrollWorstFrame: 0, redraw: 0 };
+
+  /** Measure how long until the screen has caught up (two frames later). */
+  measure(key: "lift" | "redraw") {
+    const t0 = performance.now();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const ms = performance.now() - t0;
+        this.perf[key] = ms;
+        if (key === "lift") this.perf.liftWorst = Math.max(this.perf.liftWorst * 0.9, ms);
+        this.events.emit("perf" as never);
+      }),
+    );
   }
 
   /** A short message at the bottom of the page, optionally with one button (e.g. Undo). */
