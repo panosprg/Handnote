@@ -70,6 +70,15 @@ const FILE_MIGRATIONS: Record<number, (f: any) => any> = {
   },
 };
 
+/**
+ * Handwriting never has a fill. Excalidraw fills a freehand stroke whose end lands near its
+ * start (within 8 px: small "a", "o", "d", "m"...) with the stroke's background colour; strokes
+ * written while that colour wasn't "transparent" showed a black wedge inside the letter.
+ */
+export function unfillInk(e: any) {
+  return e && e.type === "freedraw" && e.backgroundColor !== "transparent" ? { ...e, backgroundColor: "transparent" } : e;
+}
+
 /** Throws if the file isn't valid JSON (the view then refuses to overwrite it). */
 export function parseNote(raw: string, fallbackTemplate: Template): HandnoteFile {
   let parsed = raw.trim() ? JSON.parse(raw) : { handnote: { version: FILE_VERSION } };
@@ -92,7 +101,7 @@ export function parseNote(raw: string, fallbackTemplate: Template): HandnoteFile
       scrollY: h.scrollY,
       zoom: h.zoom,
     },
-    elements: Array.isArray(parsed.elements) ? parsed.elements : [],
+    elements: Array.isArray(parsed.elements) ? parsed.elements.map(unfillInk) : [],
     appState: parsed.appState ?? {},
     files: parsed.files ?? {},
   };

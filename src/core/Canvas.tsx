@@ -225,6 +225,7 @@ export default function Canvas(props: CanvasProps) {
               viewBackgroundColor: "transparent",
               penMode: true,
               currentItemRoughness: 0,
+              currentItemBackgroundColor: "transparent",
               ...(initial.handnote.scrollX !== undefined
                 ? {
                     scrollX: initial.handnote.scrollX,

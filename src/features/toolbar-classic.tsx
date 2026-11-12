@@ -54,6 +54,7 @@ function allItems(ctx: HandnoteContext): Item[] {
       active: ui.showNative,
       run: () => ctx.setState({ showNative: !ui.showNative }),
     },
+    { key: "export", label: "Export PDF", icon: "share", active: ui.panel === "export", run: () => ctx.togglePanel("export") },
     { key: "notebook", label: "Notebook", icon: "notebook", active: ui.panel === "paper", run: () => ctx.togglePanel("paper") },
   );
   return items;

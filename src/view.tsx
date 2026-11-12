@@ -51,6 +51,19 @@ class NotePicker extends FuzzySuggestModal<TFile> {
   }
 }
 
+/** 0-based page indexes → "1-3, 5" */
+function describePages(pages: number[]): string {
+  const sorted = [...new Set(pages)].sort((a, b) => a - b).map((p) => p + 1);
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    parts.push(j > i ? `${sorted[i]}-${sorted[j]}` : `${sorted[i]}`);
+    i = j;
+  }
+  return parts.join(", ");
+}
+
 export class HandnoteView extends TextFileView {
   private root: Root | null = null;
   private api: ExcalidrawImperativeAPI | null = null;
@@ -434,18 +447,29 @@ export class HandnoteView extends TextFileView {
       return { status: r.status, text: r.text };
     },
     openLink: (link: string) => this.app.workspace.openLinkText(link.replace(/^\[\[|\]\]$/g, ""), this.file?.path ?? "", true),
-    exportPdf: async () => {
+    mobile: Platform.isMobile,
+    exportPdf: async (pages?: number[], then: "open" | "share" = "open") => {
       if (!this.ctx || !this.file) return;
       const notice = new Notice("Handnote: making the PDF…", 0);
       try {
-        const bytes = await exportPdf(this.ctx, undefined, await this.originalPdf());
+        await this.flush();
+        const bytes = await exportPdf(this.ctx, pages, await this.originalPdf());
         // In Handnote/Exports (never next to the notebook: that could overwrite the PDF it was made from).
         const exportsDir = handnoteFolders(this.plugin.store.get().core).exports;
         await ensureFolder(this.app, exportsDir);
-        const path = normalizePath(`${exportsDir}/${this.file.basename}.pdf`);
+        const all = this.ctx.state.pages.sizes.length;
+        const part = !pages || pages.length === all ? "" : pages.length === 1 ? ` (page ${pages[0] + 1})` : ` (pages ${describePages(pages)})`;
+        const path = normalizePath(`${exportsDir}/${this.file.basename}${part}.pdf`);
         await this.writePdf(path, bytes);
         notice.hide();
-        new Notice(`Saved ${path}. Open it from your vault to print or share it.`);
+        const openWith = (this.app as unknown as { openWithDefaultApp?: (p: string) => unknown }).openWithDefaultApp;
+        if (then === "share" && openWith) {
+          // iPad: the system's viewer opens with the share button (Save to Files, AirDrop, Mail, Print…).
+          openWith.call(this.app, path);
+          new Notice(`Saved ${path}. Use the share button to send it.`);
+          return;
+        }
+        new Notice(`Saved ${path}.`);
         await this.app.workspace.getLeaf("tab").openFile(this.app.vault.getFileByPath(path)!);
       } catch (e) {
         notice.hide();

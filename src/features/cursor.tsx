@@ -59,11 +59,17 @@ function Cursor({ ctx, settings }: { ctx: HandnoteContext; settings: S }) {
     window.addEventListener("pointerdown", show, true);
     ctx.root.addEventListener("pointerleave", hide);
     const offState = ctx.events.on("state", hide);
+    // The pen pipeline keeps the Pencil's own events from reaching this listener while writing:
+    // hide the hover dot when the Pencil touches down (it used to stay behind next to the last letter).
+    const offPen = ctx.events.on("penDown" as never, (() => {
+      if (!ctx.state.tool.includes("eraser")) hide();
+    }) as never);
     return () => {
       window.removeEventListener("pointermove", show, true);
       window.removeEventListener("pointerdown", show, true);
       ctx.root.removeEventListener("pointerleave", hide);
       offState();
+      offPen();
     };
   }, [ctx]);
 

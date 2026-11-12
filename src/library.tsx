@@ -169,6 +169,7 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
     e.preventDefault();
     const m = new Menu();
     m.addItem((i) => i.setTitle("Open").setIcon("book-open").onClick(() => open(f)));
+    m.addItem((i) => i.setTitle("Export as PDF…").setIcon("file-down").onClick(() => void plugin.exportNotebook(f)));
     m.addItem((i) =>
       i
         .setTitle("Rename")

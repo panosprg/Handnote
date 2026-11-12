@@ -663,6 +663,18 @@
   color: var(--hn-text);
   font-size: 13px;
 }
+.hn-range.hn-range-wide {
+  width: 100%;
+  box-sizing: border-box;
+}
+.hn-export-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hn-root button.hn-chip.hn-chip-primary {
+  background: var(--interactive-accent, #007aff);
+  color: var(--text-on-accent, #fff);
+}
 .hn-root button.hn-chip[disabled] {
   opacity: 0.45;
   pointer-events: none;

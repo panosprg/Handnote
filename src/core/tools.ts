@@ -13,6 +13,8 @@ function activateInk(ctx: HandnoteContext, tool: InkToolId) {
       currentItemStrokeColor: cfg.color,
       currentItemStrokeWidth: cfg.width,
       currentItemOpacity: cfg.opacity,
+      // Handwriting is never filled (see unfillInk in data.ts).
+      currentItemBackgroundColor: "transparent",
     },
     captureUpdate: CaptureUpdateAction.NEVER,
   });

@@ -8,6 +8,17 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.14.0 (12 Nov 2026)
+- Fixed: small letters that end near where they start ("a", "o", "d", "m"…) showed a black wedge, both while
+  writing and after. Excalidraw fills any stroke whose end is within 8 px of its start with the stroke's
+  background colour, and new strokes had picked up a non-transparent one. Handwriting is never filled now, and
+  notebooks with filled letters are repaired when they open.
+- The Pencil's hover dot no longer stays behind next to the last letter while you write.
+- Export as PDF: a button in the top bar (and Notebook → Export / print), all pages / this page / a range,
+  Save PDF, Share (iPad share sheet: Files, AirDrop, Mail…) or Print. Also "Export as PDF…" in the library's
+  notebook menu and the file menu. Exports include handwriting, highlights, paper, and for PDF notebooks the
+  PDF's real (selectable) text.
+
 ### 0.13.0 (12 Nov 2026)
 - Select text in PDFs: "Select text" tool (PDF notebooks only). Drag the Pencil over words, tap a word, drag
   from either end to adjust; Copy (joins hyphenated line breaks), Highlight (word highlights, one undo step),

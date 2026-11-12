@@ -17,6 +17,7 @@
  * Features add filters with `ctx.pen.addFilter(...)`.
  */
 import type { HandnoteContext, El } from "./context";
+import { flushSync } from "react-dom";
 import { appendPoint, finalizeStroke, newStroke, WetInk } from "./wet-ink";
 
 export interface PenPoint {
@@ -139,6 +140,9 @@ export class PenPipeline {
     if (this.ctx.api.getAppState().activeTool.type !== "freedraw") return;
     const filters = this.filters.map((f) => f.start(e, this.ctx)).filter((f): f is StrokeFilter => !!f);
     const fast = this.fast();
+    // Without fast ink Excalidraw draws the stroke: make sure it isn't filled (see unfillInk in data.ts).
+    if (!fast && (this.ctx.api.getAppState() as { currentItemBackgroundColor?: string }).currentItemBackgroundColor !== "transparent")
+      flushSync(() => this.ctx.api.updateScene({ appState: { currentItemBackgroundColor: "transparent" } }));
     if (!filters.length && !fast) return;
 
     this.active = {

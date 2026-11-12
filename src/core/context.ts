@@ -57,7 +57,13 @@ export interface UiState {
 
 /** Things only the Obsidian side can do (files, links), provided by the view. */
 export interface HostActions {
-  exportPdf(): Promise<void>;
+  /**
+   * Export the notebook as a PDF into Handnote/Exports (all pages, or 0-based page indexes).
+   * "open": open it in Obsidian; "share": hand it to the system (iPad share sheet: Files, AirDrop, Mail…).
+   */
+  exportPdf(pages?: number[], then?: "open" | "share"): Promise<void>;
+  /** Is this an iPad/phone (share sheet available)? */
+  mobile?: boolean;
   openLink(link: string): void;
   /** Ask the user to pick a note in the vault; resolves to its link text or null. */
   pickNote(): Promise<string | null>;

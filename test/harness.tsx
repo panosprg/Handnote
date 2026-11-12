@@ -64,8 +64,10 @@ const mount = (raw: string, images: (string | undefined)[] = []) => {
           const doc = await PDFDocument.load(bytes);
           w.printed = { pages: pages ?? null, count: doc.getPageCount() };
         },
-        exportPdf: async () => {
-          w.exportedPdf = await exportPdf(w.ctx);
+        exportPdf: async (pages?: number[], then?: string) => {
+          w.exportedPdf = await exportPdf(w.ctx, pages);
+          const doc = await PDFDocument.load(w.exportedPdf);
+          w.exported = { pages: pages ?? null, count: doc.getPageCount(), then: then ?? "open" };
         },
       }}
       loadPageImages={async () => images}

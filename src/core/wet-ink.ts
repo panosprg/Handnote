@@ -174,7 +174,8 @@ export function newStroke(ctx: HandnoteContext, x: number, y: number, pressure: 
     height: 0,
     angle: 0,
     strokeColor: st.currentItemStrokeColor,
-    backgroundColor: st.currentItemBackgroundColor ?? "transparent",
+    // never filled (Excalidraw fills a stroke that ends near its start with this colour)
+    backgroundColor: "transparent",
     fillStyle: st.currentItemFillStyle ?? "solid",
     strokeWidth: st.currentItemStrokeWidth,
     strokeStyle: st.currentItemStrokeStyle ?? "solid",

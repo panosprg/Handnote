@@ -359,35 +359,66 @@ export function PaperPanel({ ctx }: { ctx: HandnoteContext }) {
   );
 }
 
-function PrintRow({ ctx }: { ctx: HandnoteContext }) {
+/** Export as PDF / share / print: all pages, this page, or a range. */
+export function ExportPanel({ ctx }: { ctx: HandnoteContext }) {
   const ui = useCtxState(ctx);
+  const [scope, setScope] = useState<"all" | "page" | "range">("all");
   const [range, setRange] = useState("");
   const count = ui.pages.sizes.length;
-  const go = (pages?: number[]) => {
-    ctx.setState({ panel: null });
-    void ctx.host.print?.(pages);
-  };
   const picked = parsePageRange(range, count);
+  const pages = scope === "all" ? undefined : scope === "page" ? [ctx.currentPage()] : picked;
+  const ready = scope !== "range" || picked.length > 0;
+  const run = (f: () => void) => {
+    ctx.setState({ panel: null });
+    f();
+  };
+  const what =
+    scope === "all" ? `all ${count} page${count > 1 ? "s" : ""}` : scope === "page" ? `page ${ctx.currentPage() + 1}` : picked.length ? `${picked.length} page${picked.length > 1 ? "s" : ""}` : "pages";
   return (
     <>
-      <div className="hn-label">Print</div>
-      <div className="hn-row hn-print">
-        <button className="hn-chip" aria-label="Print all pages" onClick={() => go()}>
-          <Icon name="printer" /> All pages
+      <div className="hn-label">Export as PDF</div>
+      <div className="hn-row" role="radiogroup" aria-label="Pages">
+        {(
+          [
+            ["all", "All pages"],
+            ["page", "This page"],
+            ["range", "Pages…"],
+          ] as const
+        ).map(([k, label]) => (
+          <button key={k} role="radio" aria-checked={scope === k} className={`hn-type ${scope === k ? "is-active" : ""}`} onClick={() => setScope(k)}>
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+      {scope === "range" && (
+        <div className="hn-row">
+          <input
+            className="hn-range hn-range-wide"
+            aria-label="Pages to export"
+            autoFocus
+            placeholder={count > 1 ? `e.g. 1-${Math.min(3, count)}, ${count}` : "1"}
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+          />
+        </div>
+      )}
+      <div className="hn-row hn-export-actions">
+        <button className="hn-chip hn-chip-primary" disabled={!ready} aria-label="Save PDF" onClick={() => run(() => void ctx.host.exportPdf(pages, "open"))}>
+          <Icon name="file-down" /> Save PDF
         </button>
-        <button className="hn-chip" aria-label="Print this page" onClick={() => go([ctx.currentPage()])}>
-          This page
-        </button>
-        <input
-          className="hn-range"
-          aria-label="Pages to print"
-          placeholder={count > 1 ? `e.g. 1-${Math.min(3, count)}` : "1"}
-          value={range}
-          onChange={(e) => setRange(e.target.value)}
-        />
-        <button className="hn-chip" disabled={!picked.length} aria-label="Print these pages" onClick={() => go(picked)}>
-          Print {picked.length ? `${picked.length} page${picked.length > 1 ? "s" : ""}` : "pages"}
-        </button>
+        {ctx.host.mobile && (
+          <button className="hn-chip" disabled={!ready} aria-label="Share PDF" onClick={() => run(() => void ctx.host.exportPdf(pages, "share"))}>
+            <Icon name="share" /> Share
+          </button>
+        )}
+        {ctx.host.print && (
+          <button className="hn-chip" disabled={!ready} aria-label="Print" onClick={() => run(() => void ctx.host.print!(pages))}>
+            <Icon name="printer" /> Print
+          </button>
+        )}
+      </div>
+      <div className="hn-hint">
+        {what}, with your handwriting{ctx.host.isPdf?.() ? ", highlights and the PDF's own text (still selectable)" : " and the paper"}. Saved in Handnote/Exports.
       </div>
     </>
   );
@@ -413,6 +444,8 @@ export function PanelHost({
   if (st.panel === "tool") {
     const P = ctx.activeTool()?.Panel;
     content = P ? <P ctx={ctx} /> : null;
+  } else if (st.panel === "export") {
+    content = <ExportPanel ctx={ctx} />;
   } else if (st.panel === "paper") {
     content = (
       <>
@@ -422,14 +455,8 @@ export function PanelHost({
           <button className="hn-chip" onClick={() => ctx.addPage()}>
             <Icon name="file-plus" /> Add page
           </button>
-          <button
-            className="hn-chip"
-            onClick={() => {
-              ctx.setState({ panel: null });
-              void ctx.host.exportPdf();
-            }}
-          >
-            <Icon name="file-down" /> Export PDF
+          <button className="hn-chip" onClick={() => ctx.setState({ panel: "export" })}>
+            <Icon name="file-down" /> Export / print
           </button>
           <button
             className="hn-chip"
@@ -470,7 +497,6 @@ export function PanelHost({
             </div>
           </>
         )}
-        {ctx.host.print && <PrintRow ctx={ctx} />}
       </>
     );
   }

@@ -138,7 +138,7 @@ export default class HandnotePlugin extends Plugin {
       checkCallback: (checking) => {
         const view = this.app.workspace.getActiveViewOfType(HandnoteView);
         if (!view?.ctx) return false;
-        if (!checking) void view.ctx.host.exportPdf();
+        if (!checking) view.ctx.setState({ panel: "export" });
         return true;
       },
     });
@@ -181,6 +181,13 @@ export default class HandnotePlugin extends Plugin {
               .setIcon("notebook-pen")
               .onClick(() => this.createNote(file.path, "Notebook")),
           );
+        } else if (file instanceof TFile && file.extension === "handnote") {
+          menu.addItem((item) =>
+            item
+              .setTitle("Export as PDF…")
+              .setIcon("file-down")
+              .onClick(() => void this.exportNotebook(file)),
+          );
         } else if (file instanceof TFile && file.extension === "pdf") {
           menu.addItem((item) =>
             item
@@ -208,6 +215,21 @@ export default class HandnotePlugin extends Plugin {
       this.saveTimer = null;
       void this.saveData(this.store.get());
     }, 500);
+  }
+
+  /** Open a notebook (or switch to it) and show its Export / print panel. */
+  async exportNotebook(file: TFile) {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_HANDNOTE).find((l) => (l.view as HandnoteView).file?.path === file.path);
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.openFile(file);
+    }
+    this.app.workspace.setActiveLeaf(leaf, { focus: true });
+    for (let i = 0; i < 100; i++) {
+      const ctx = (leaf.view as HandnoteView).ctx;
+      if (ctx) return ctx.setState({ panel: "export" });
+      await new Promise((r) => window.setTimeout(r, 100));
+    }
   }
 
   /** Where Handnote's files go (all inside one folder). */
