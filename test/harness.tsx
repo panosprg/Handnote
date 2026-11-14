@@ -102,6 +102,10 @@ if (q.has("library")) {
     await mk("Handnote/Reading notes.handnote", "#5f3dc4", 7);
     // Files outside the Handnote folder must not show up in the library.
     await mk("Elsewhere.handnote", "#000000", 1);
+    app.workspace.getLeaf = () => ({ openFile: async (f: { path: string }) => (w.opened = f.path) });
+    await app.vault.createFolder("Handnote/Exports");
+    await app.vault.createBinary("Handnote/Exports/Ideas.pdf", new ArrayBuffer(2048));
+    await app.vault.createBinary("Handnote/Exports/Gym log (page 1).pdf", new ArrayBuffer(4096));
     w.created = [];
     const plugin = {
       app,

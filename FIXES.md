@@ -8,6 +8,11 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.14.1 (14 Nov 2026)
+- Exports show up in the library: an "Exports" tile next to your notebooks lists every exported PDF (newest
+  first). Tap to open; long-press for Share…, Rename, Delete. (The library only showed folders with notebooks
+  in them, so Handnote/Exports was invisible there.)
+
 ### 0.14.0 (12 Nov 2026)
 - Fixed: small letters that end near where they start ("a", "o", "d", "m"…) showed a black wedge, both while
   writing and after. Excalidraw fills any stroke whose end is within 8 px of its start with the stroke's

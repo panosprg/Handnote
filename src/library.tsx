@@ -9,6 +9,7 @@ import {
   TFile,
   TFolder,
   normalizePath,
+  Platform,
   setIcon,
   type App,
   type WorkspaceLeaf,
@@ -117,7 +118,7 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
       app.vault.on("create", bump),
       app.vault.on("delete", bump),
       app.vault.on("rename", bump),
-      app.vault.on("modify", (f) => f instanceof TFile && f.extension === "handnote" && bump()),
+      app.vault.on("modify", (f) => f instanceof TFile && (f.extension === "handnote" || f.extension === "pdf") && bump()),
     ];
     return () => refs.forEach((r) => app.vault.offref(r));
   }, [app]);
@@ -128,7 +129,20 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
   const inRoot = (p: string) => p === rootPath || p.startsWith(rootPath + "/");
   const folder =
     ((inRoot(path) ? app.vault.getAbstractFileByPath(path) : null) as TFolder | null) ?? rootFolder ?? app.vault.getRoot();
-  const folders = folder.children.filter((c): c is TFolder => c instanceof TFolder && hasNotebooks(c));
+  // Exported PDFs: the Exports folder has no notebooks, so it gets a tile of its own.
+  const exportsPath = plugin.folders().exports;
+  const inExports = folder.path === exportsPath;
+  const exportsFolder = app.vault.getAbstractFileByPath(exportsPath);
+  const exportCount = exportsFolder instanceof TFolder ? exportsFolder.children.filter((c) => c instanceof TFile && c.extension === "pdf").length : 0;
+  const exportsHere = !inExports && exportCount > 0 && exportsFolder instanceof TFolder && exportsFolder.parent?.path === folder.path;
+  const pdfs = useMemo(
+    () =>
+      inExports
+        ? folder.children.filter((c): c is TFile => c instanceof TFile && c.extension === "pdf").sort((a, b) => b.stat.mtime - a.stat.mtime)
+        : [],
+    [folder, tick, inExports],
+  );
+  const folders = folder.children.filter((c): c is TFolder => c instanceof TFolder && hasNotebooks(c) && c.path !== exportsPath);
   const notebooks = useMemo(
     () =>
       folder.children
@@ -245,6 +259,41 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
     m.showAtPosition({ x: e.clientX, y: e.clientY });
   };
 
+  /** iPad/iPhone: the system viewer with its share button (Files, AirDrop, Mail, Print…). */
+  const share = (f: TFile) => {
+    const openWith = (app as unknown as { openWithDefaultApp?: (p: string) => unknown }).openWithDefaultApp;
+    if (openWith) openWith.call(app, f.path);
+    else void open(f);
+  };
+
+  const pdfMenu = (e: React.MouseEvent | React.PointerEvent, f: TFile) => {
+    e.preventDefault();
+    const m = new Menu();
+    m.addItem((i) => i.setTitle("Open").setIcon("file-text").onClick(() => open(f)));
+    m.addItem((i) => i.setTitle(Platform.isMobile ? "Share…" : "Open in default app").setIcon("share").onClick(() => share(f)));
+    m.addItem((i) =>
+      i
+        .setTitle("Rename")
+        .setIcon("pencil")
+        .onClick(() =>
+          new PromptModal(app, "Rename PDF", f.basename, (v) => {
+            if (v) app.fileManager.renameFile(f, normalizePath(`${f.parent?.path ?? ""}/${v}.pdf`));
+          }).open(),
+        ),
+    );
+    m.addSeparator();
+    m.addItem((i) =>
+      i
+        .setTitle("Delete")
+        .setIcon("trash-2")
+        .onClick(async () => {
+          await app.vault.trash(f, true);
+          new Notice(`Moved "${f.basename}" to the trash`);
+        }),
+    );
+    m.showAtPosition({ x: e.clientX, y: e.clientY });
+  };
+
   // Long-press for touch (iPad has no right-click).
   const longPress = (cb: (e: React.PointerEvent) => void) => {
     let t: number | null = null;
@@ -320,6 +369,35 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
             <div className="hn-lib-meta">{countNotebooks(d)} notebook{countNotebooks(d) === 1 ? "" : "s"}</div>
           </div>
         ))}
+        {exportsHere && (
+          <div className="hn-lib-item" onClick={() => setPath(exportsPath)} aria-label="Exports">
+            <div className="hn-lib-folder hn-lib-exports">
+              <Icon name="file-down" />
+            </div>
+            <div className="hn-lib-name">Exports</div>
+            <div className="hn-lib-meta">
+              {exportCount} PDF{exportCount === 1 ? "" : "s"}
+            </div>
+          </div>
+        )}
+        {pdfs.map((f) => (
+          <div
+            key={f.path}
+            className="hn-lib-item"
+            onClick={() => open(f)}
+            onContextMenu={(e) => pdfMenu(e, f)}
+            {...longPress((e) => pdfMenu(e, f))}
+          >
+            <div className="hn-lib-folder hn-lib-pdf">
+              <Icon name="file-text" />
+              <span className="hn-lib-pdf-tag">PDF</span>
+            </div>
+            <div className="hn-lib-name">{f.basename}</div>
+            <div className="hn-lib-meta">
+              {new Date(f.stat.mtime).toLocaleDateString()} · {Math.max(1, Math.round(f.stat.size / 1024))} KB
+            </div>
+          </div>
+        ))}
         {notebooks.map((f) => {
           const info = infos[f.path];
           return (
@@ -348,7 +426,10 @@ export function Library({ plugin, path, setPath }: { plugin: HandnotePlugin; pat
             </div>
           );
         })}
-        {!folders.length && !notebooks.length && (
+        {inExports && !pdfs.length && (
+          <div className="hn-lib-empty">No exports yet. In a notebook, tap the share button in the top bar → Save PDF.</div>
+        )}
+        {!inExports && !folders.length && !notebooks.length && !exportsHere && (
           <div className="hn-lib-empty">No notebooks here yet. Tap “New notebook” to start one.</div>
         )}
       </div>
