@@ -46,8 +46,15 @@ export async function renderPage(ctx: HandnoteContext, r: PageRect, template: Te
   page.height = Math.round((r.h + (legend.length ? LEGEND_H : 0)) * SCALE);
   const g = page.getContext("2d")!;
   const bg = ctx.state.pageImages[r.index];
+  if (legend.length) {
+    // the strip for the colour key under the page
+    g.fillStyle = "#ffffff";
+    g.fillRect(0, 0, page.width, page.height);
+  }
   if (bg) {
-    g.drawImage(await loadImage(bg), 0, 0, page.width, page.height);
+    // Only the page's own height: the key's strip is extra. (Stretching the page image over it
+    // squashed the text downwards, so every highlight looked too high, more so near the bottom.)
+    g.drawImage(await loadImage(bg), 0, 0, page.width, Math.round(r.h * SCALE));
   } else {
     drawTemplate(g, template, r.w, r.h, SCALE);
   }
@@ -106,6 +113,7 @@ export async function exportPdf(ctx: HandnoteContext, only?: number[], original?
     } catch (e) {
       // A PDF pdf-lib can't edit (encrypted, broken): fall back to pictures of the pages.
       console.warn("Handnote: couldn't add to the original PDF, exporting page images instead", e);
+      ctx.toast("Couldn't write into the original PDF, so the pages were exported as pictures (text not selectable)");
     }
   }
   const doc = await PDFDocument.create();

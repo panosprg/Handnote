@@ -1156,6 +1156,19 @@ with sync_playwright() as p:
     r = exp[0]["annots"][0]["rect"] if exp[0]["annots"] else [0, 0, 0, 0]
     check("exports put highlights on the words when the PDF's crop box reaches past the page",
           r[1] < 700 < r[3] and r[3] - 700 < 16 and exp[0]["view"][3] == 842, f"rect {r}, view {exp[0]['view']}")
+    # Pages exported as pictures (original PDF missing): the page image must not be stretched over the key's strip.
+    rows = page.evaluate("""(async () => {
+        const rects = ctx.state.pages; const r = {x: 0, y: 0, w: rects.sizes[0].w, h: rects.sizes[0].h, index: 0};
+        const plain = await renderPage(ctx, {...r, x: 1e9, y: 1e9}, 'blank', []);
+        const keyed = await renderPage(ctx, {...r, x: 1e9, y: 1e9}, 'blank', [{color: '#ffd43b', label: 'Evidence'}]);
+        // darkest text row between y 150 and 230 css px, x 80..300 (the 'Evidence shows' line)
+        const row = c => { const g = c.getContext('2d'); let best = 0, by = 0;
+          for (let y = 300; y < 460; y++) { const d = g.getImageData(160, y, 440, 1).data; let s = 0;
+            for (let i = 0; i < d.length; i += 4) s += 255 - d[i]; if (s > best) [best, by] = [s, y]; } return by; };
+        return [row(plain), row(keyed), plain.height, keyed.height];
+    })()""")
+    check("pages exported as pictures keep the page's proportions when the colour key is added",
+          abs(rows[0] - rows[1]) <= 1 and rows[3] > rows[2], str(rows))
     check("no JavaScript errors (crop box)", not errors, "; ".join(errors[:3]))
     ctx.close()
 

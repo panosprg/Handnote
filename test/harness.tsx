@@ -5,7 +5,7 @@ import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { loadPdfJs } from "obsidian";
 import { pageRects } from "../src/core/pages";
 import Canvas from "../src/core/Canvas";
-import { exportPdf } from "../src/core/export";
+import { exportPdf, renderPage, exportLegends } from "../src/core/export";
 import { FeatureRegistry } from "../src/core/registry";
 import { loadSettings, SettingsStore } from "../src/core/settings";
 import { parseNote, emptyNote } from "../src/data";
@@ -26,6 +26,8 @@ w.PDFDocument = PDFDocument;
 w.parseNote = parseNote;
 
 /** Make a 2-page test PDF, import it like the plugin does, and return the note + assets. */
+w.renderPage = renderPage;
+w.exportLegends = exportLegends;
 w.makeAndImportPdf = async () => {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);

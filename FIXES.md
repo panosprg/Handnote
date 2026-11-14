@@ -8,6 +8,12 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.14.3 (14 Nov 2026)
+- Fixed: exports drawn as pictures (when the original PDF can't be used) stretched each page image over the
+  colour key's strip, so the text slid down under the ink: highlights looked too high, more so near the bottom.
+- Exports find the original PDF even after it was moved or its folder renamed (looked up by file name), so the
+  export keeps the PDF's real, selectable text. If it still can't be found, a message says so.
+
 ### 0.14.2 (14 Nov 2026)
 - Fixed: in exports of PDF notebooks, highlights and handwriting sat too high on PDFs whose crop box reaches past
   the page (common in slides exported from PowerPoint/Keynote). Exports now use the same visible area as the

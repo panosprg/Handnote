@@ -223,7 +223,13 @@ export class HandnoteView extends TextFileView {
     if (!info) return null;
     const saved = await this.readBytes(info.original);
     if (saved) return saved;
-    const source = await this.readBytes(info.source);
+    let source = await this.readBytes(info.source);
+    if (!source) {
+      // The PDF was moved or its folder renamed: find it by name elsewhere in the vault.
+      const name = info.source.split("/").pop();
+      const moved = this.app.vault.getFiles().find((f) => f.extension === "pdf" && f.name === name && !f.path.startsWith(handnoteFolders(this.plugin.store.get().core).exports + "/"));
+      if (moved) source = new Uint8Array(await this.app.vault.readBinary(moved));
+    }
     // Already annotated by Handnote but its clean copy is gone: can't be used as the original.
     if (!source || (await isAnnotated(source))) return null;
     if (keep) {
@@ -396,7 +402,10 @@ export class HandnoteView extends TextFileView {
       if (!this.ctx || !this.file) return;
       const notice = new Notice("Handnote: getting the pages ready to print…", 0);
       try {
-        const bytes = await exportPdf(this.ctx, pages, await this.originalPdf());
+        const original = await this.originalPdf();
+        if (this.pdfInfo() && !original)
+          new Notice("Handnote: the original PDF wasn't found (moved or renamed?), so the pages are exported as pictures.", 8000);
+        const bytes = await exportPdf(this.ctx, pages, original);
         notice.hide();
         if (!Platform.isMobile) {
           // Desktop: print the PDF straight from a hidden frame.
@@ -453,7 +462,10 @@ export class HandnoteView extends TextFileView {
       const notice = new Notice("Handnote: making the PDF…", 0);
       try {
         await this.flush();
-        const bytes = await exportPdf(this.ctx, pages, await this.originalPdf());
+        const original = await this.originalPdf();
+        if (this.pdfInfo() && !original)
+          new Notice("Handnote: the original PDF wasn't found (moved or renamed?), so the pages are exported as pictures.", 8000);
+        const bytes = await exportPdf(this.ctx, pages, original);
         // In Handnote/Exports (never next to the notebook: that could overwrite the PDF it was made from).
         const exportsDir = handnoteFolders(this.plugin.store.get().core).exports;
         await ensureFolder(this.app, exportsDir);
