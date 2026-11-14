@@ -202,6 +202,8 @@ if (q.has("library")) {
     p1.drawText("A second claim about infor-", { x: 60, y: 660, size: 16, font });
     p1.drawText("mation systems follows here.", { x: 60, y: 638, size: 16, font });
     p1.drawText("Unrelated closing sentence.", { x: 60, y: 560, size: 16, font });
+    // ?crop: a crop box reaching past the page (PowerPoint/Keynote exports do this); viewers show only the overlap.
+    if (q.has("crop")) p1.setCropBox(0, 0, 595, 900);
     // A page stored sideways and shown turned (like many scanned slides): its text reads normally on screen.
     const p2 = doc.addPage([595, 842]);
     p2.setRotation(degrees(90));

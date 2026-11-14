@@ -78,6 +78,27 @@ const toPng = (c: HTMLCanvasElement) =>
 /* Page geometry (rotated pages included)                              */
 /* ------------------------------------------------------------------ */
 
+/** A box as [x1, y1, x2, y2] with x1 < x2 and y1 < y2 (boxes may be written either way round). */
+function norm(b: { x: number; y: number; width: number; height: number }) {
+  return [Math.min(b.x, b.x + b.width), Math.min(b.y, b.y + b.height), Math.max(b.x, b.x + b.width), Math.max(b.y, b.y + b.height)];
+}
+
+/**
+ * The part of a page that is shown: the crop box clipped to the media box, exactly as pdf.js
+ * (which made the page images and word boxes in the notebook) does it. Using the raw crop box
+ * put everything too high on pages whose crop box reaches past the top of the page.
+ */
+export function visibleBox(page: PDFPage) {
+  const m = norm(page.getMediaBox());
+  const c = norm(page.getCropBox());
+  const x1 = Math.max(m[0], c[0]);
+  const y1 = Math.max(m[1], c[1]);
+  const x2 = Math.min(m[2], c[2]);
+  const y2 = Math.min(m[3], c[3]);
+  const [a, b, cc, d] = x2 > x1 && y2 > y1 ? [x1, y1, x2, y2] : m;
+  return { x: a, y: b, width: cc - a, height: d - b };
+}
+
 /**
  * How a page is shown vs. how it's stored. The notebook sees the page as displayed
  * (rotation applied, top-left origin, CSS px); PDF drawing happens in the page's own
@@ -98,7 +119,11 @@ class PageSpace {
     readonly r: PageRect,
   ) {
     this.rot = (((page.getRotation().angle ?? 0) % 360) + 360) % 360;
-    this.box = page.getCropBox();
+    this.box = visibleBox(page);
+    // Make every viewer show exactly this part (some show a crop box that reaches past the page).
+    const c = page.getCropBox();
+    if (c.x !== this.box.x || c.y !== this.box.y || c.width !== this.box.width || c.height !== this.box.height)
+      page.setCropBox(this.box.x, this.box.y, this.box.width, this.box.height);
     const turned = this.rot === 90 || this.rot === 270;
     this.dispW = turned ? this.box.height : this.box.width;
     this.dispH = turned ? this.box.width : this.box.height;

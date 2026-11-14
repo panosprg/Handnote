@@ -1144,6 +1144,21 @@ with sync_playwright() as p:
     ctx.close()
 
     # ---------- selecting PDF text ----------
+    # A PDF whose crop box reaches past the page (PowerPoint/Keynote do this): exports put
+    # highlights and ink too high, because they used the raw crop box instead of the visible part.
+    ctx, page, cdp, errors = open_page("?annotate&crop", ready="window.ctx && window.ctx.state.pageText && window.ctx.state.pageImages.length === 2")
+    page.evaluate("api.updateScene({appState: {zoom: {value: 1}, scrollX: 40, scrollY: 20}})"); page.wait_for_timeout(250)
+    tap(page, "Highlighter")
+    a = page.evaluate("wordAt(0, 'Evidence', 'left')"); b = page.evaluate("wordAt(0, 'significant.', 'right')")
+    pen_stroke(cdp, wobbly(a["x"] - 6, b["x"] + 6, a["y"], 50, 2.5), page, settle=300)
+    page.evaluate("ctx.host.exportPdf()"); page.wait_for_timeout(2500)
+    exp = page.evaluate(read_pdf + "('Handnote/Exports/Week 2.pdf')")
+    r = exp[0]["annots"][0]["rect"] if exp[0]["annots"] else [0, 0, 0, 0]
+    check("exports put highlights on the words when the PDF's crop box reaches past the page",
+          r[1] < 700 < r[3] and r[3] - 700 < 16 and exp[0]["view"][3] == 842, f"rect {r}, view {exp[0]['view']}")
+    check("no JavaScript errors (crop box)", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
     ctx, page, cdp, errors = open_page("?annotate", ready="window.ctx && window.ctx.state.pageText && window.ctx.state.pageImages.length === 2")
     ctx.grant_permissions(["clipboard-read", "clipboard-write"])
     page.evaluate("ctx.minZoom = () => 0.25; ctx.clampView = (v) => v")

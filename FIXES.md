@@ -8,6 +8,12 @@ Things to fix in the next batch. Add to it, then fix them all together in one re
 
 ## Done
 
+### 0.14.2 (14 Nov 2026)
+- Fixed: in exports of PDF notebooks, highlights and handwriting sat too high on PDFs whose crop box reaches past
+  the page (common in slides exported from PowerPoint/Keynote). Exports now use the same visible area as the
+  notebook (crop box clipped to the page, like pdf.js), and set it in the file so every viewer shows the same page.
+  Also applies to "write into the PDF".
+
 ### 0.14.1 (14 Nov 2026)
 - Exports show up in the library: an "Exports" tile next to your notebooks lists every exported PDF (newest
   first). Tap to open; long-press for Share…, Rename, Delete. (The library only showed folders with notebooks
